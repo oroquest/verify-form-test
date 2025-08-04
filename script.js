@@ -56,6 +56,16 @@ document.addEventListener("DOMContentLoaded", () => {
     "54": "Via Gorizia 3 IT-20010 Pogliano"
   };
 
+  const nameDB = {
+    "52": "Irene Bartolini",
+    "53": "Iryna Basaraba",
+    "54": "Luigi Bassetti"
+  };
+
+  if (nameDB[glaeubigerId]) {
+    document.getElementById("name").value = nameDB[glaeubigerId];
+  }
+
   if (adressDB[glaeubigerId]) {
     document.getElementById("adresse").value = adressDB[glaeubigerId];
   }
