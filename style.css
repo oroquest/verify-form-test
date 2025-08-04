@@ -41,12 +41,3 @@ button {
 .checkbox-group {
   margin-top: 1rem;
 }
-
-.checkbox-line {
-  display: block;
-  margin-top: 1rem;
-}
-.checkbox-line input[type="checkbox"] {
-  margin-right: 0.5rem;
-  vertical-align: top;
-}
