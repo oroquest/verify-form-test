@@ -41,3 +41,17 @@ button {
 .checkbox-group {
   margin-top: 1rem;
 }
+.checkbox-line-grid {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  column-gap: 0.8rem;
+  align-items: start;
+  margin-top: 1.5rem;
+}
+.checkbox-line-grid input[type="checkbox"] {
+  margin-top: 0.4rem;
+}
+.checkbox-line-grid label {
+  margin: 0;
+  line-height: 1.4;
+}
