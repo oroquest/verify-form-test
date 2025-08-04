@@ -3,40 +3,51 @@
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
-  <title>Verifizierung Ihrer E-Mail-Adresse</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Sikura Verifizierung</title>
   <link rel="stylesheet" href="style.css">
+  <script src="script.js" defer></script>
 </head>
 <body>
-  <form name="verify-form" method="POST" action="https://hook.eu2.make.com/your_webhook_here" id="verify-form">
-    <input type="hidden" name="form-name" value="verify-form" />
-    <input type="text" name="bot-field" style="display:none" />
+  <div class="container">
+    <img src="siku_logo.png" alt="Sikura Life Logo" class="logo"/>
+    <h2 data-i18n="title">Bitte bestätigen Sie Ihre Daten</h2>
 
-    <label>Gläubiger-Nr.</label>
-    <input type="text" name="glaeubiger" value="[[data:id:]]" readonly autocomplete="off" />
+    <form name="verify-form" method="POST" action="https://hook.eu2.make.com/c76tb0dfbd7i40v04a4btpt5gpuozevi" id="verify-form">
+      <div class="language-switcher">
+        <select id="language" onchange="setLanguage(this.value)">
+          <option value="de">Deutsch</option>
+          <option value="it">Italiano</option>
+          <option value="en">English</option>
+        </select>
+      </div>
 
-    <label>Token</label>
-    <input type="text" name="token" value="[[data:token:]]" readonly autocomplete="off" />
+      <label for="glaeubiger" data-i18n="glaeubiger">Gläubiger-Nr.</span></label>
+      <input type="text" id="glaeubiger" name="glaeubiger" readonly required autocomplete="off"/>
 
-    <label>Name</label>
-    <input type="text" name="name" value="[[data:name:]]" readonly autocomplete="off" />
+      <label for="token" data-i18n="token">Token</span></label>
+      <input type="text" id="token" name="token" readonly required autocomplete="off"/>
 
-    <label>E-Mail-Adresse</label>
-    <input type="email" name="email" required />
+      <label for="name" data-i18n="name">Name</span></label>
+      <input type="text" id="name" name="name" readonly autocomplete="off"/>
 
-    <label>Adresse</label>
-    <textarea name="adresse" required>[[data:name:]]</textarea>
+      <label for="email" data-i18n="email">E-Mail-Adresse</span></label>
+      <input type="text" id="email" name="email" required autocomplete="off"/>
 
-    <label>
-      <input type="checkbox" name="daten_korrekt" required />
-      Ich bestätige, dass die angegebenen Daten korrekt sind.
-    </label>
+      <label for="adresse" data-i18n="adresse">Aktuelle Adresse</span></label>
+     	  <textarea id="adresse" name="adresse" rows="3" required autocomplete="off"></textarea>
 
-    <label>
-      <input type="checkbox" name="einwilligung" required />
-      Ich stimme der Verarbeitung meiner Daten im Rahmen des Konkursverfahrens der SIKURA Leben AG i.L. gemäss DSGVO zu.
-    </label>
 
-    <button type="submit">Absenden</button>
-  </form>
+      <div class="checkbox-group">
+        <label class="checkbox-line"><input type="checkbox" id="confirm" name="confirm" /><span data-i18n="confirm1">Ich bestätige, dass die angegebenen Daten korrekt sind.</span></label>
+      </div>
+
+      <div class="checkbox-group">
+        <label class="checkbox-line"><input type="checkbox" id="privacy" name="privacy" /><span data-i18n="confirm2">Ich stimme der Verarbeitung meiner Daten im Rahmen des Konkursverfahrens der SIKURA Leben AG. i.L. gemäss DSGVO zu.</span></label>
+      </div>
+
+      <button type="submit" data-i18n="submit">Absenden</button>
+    </form>
+  </div>
 </body>
 </html>
