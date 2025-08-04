@@ -41,17 +41,22 @@ button {
 .checkbox-group {
   margin-top: 1rem;
 }
-.checkbox-line-grid {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  column-gap: 0.8rem;
-  align-items: start;
-  margin-top: 1.5rem;
+
+.checkbox-line {
+  display: block;
+  margin-top: 1rem;
 }
-.checkbox-line-grid input[type="checkbox"] {
-  margin-top: 0.4rem;
+.checkbox-line input[type="checkbox"] {
+  margin-right: 0.5rem;
+  vertical-align: top;
 }
-.checkbox-line-grid label {
-  margin: 0;
-  line-height: 1.4;
+
+.checkbox-group {
+  margin-top: 1rem;
+  text-align: center;
+}
+.checkbox-group label {
+  display: inline-block;
+  max-width: 500px;
+  text-align: left;
 }
