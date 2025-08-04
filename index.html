@@ -1,0 +1,44 @@
+
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Verifizierung – Liquidation SIKU</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+        body { font-family: sans-serif; padding: 2rem; max-width: 600px; margin: auto; }
+        label { display: block; margin-top: 1rem; }
+        input[type="text"], input[type="email"] { width: 100%; padding: 0.5rem; }
+        select { margin-top: 1rem; }
+        .hidden { display: none; }
+        .success { color: green; font-weight: bold; margin-top: 1rem; }
+    </style>
+</head>
+<body>
+    <h1 data-i18n="title">Verifizierung Ihrer Daten</h1>
+    <p data-i18n="instruction">Bitte bestätigen Sie Ihre Angaben für den weiteren Verlauf des Verfahrens.</p>
+
+    <label data-i18n="glnr_label">Gläubiger-Nr.</label>
+    <input type="text" id="glaeubigerId" readonly>
+
+    <label data-i18n="token_label">Token</label>
+    <input type="text" id="token" readonly>
+
+    <label data-i18n="email_label">E-Mail-Adresse</label>
+    <input type="email" id="email">
+
+    <label><input type="checkbox" id="confirm"> <span data-i18n="confirm_text">Ich bestätige, dass die Angaben korrekt sind.</span></label>
+
+    <button onclick="submitForm()" data-i18n="submit_button">Bestätigen</button>
+
+    <div class="success hidden" id="successMsg" data-i18n="success_msg">Vielen Dank – Ihre Angaben wurden erfasst.</div>
+
+    <select id="languageSwitcher" onchange="switchLanguage(this.value)">
+        <option value="de">Deutsch</option>
+        <option value="en">English</option>
+        <option value="it">Italiano</option>
+    </select>
+
+    <script src="form.js"></script>
+</body>
+</html>
