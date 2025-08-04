@@ -21,7 +21,7 @@ function setLanguage(lang) {
       email: "Indirizzo e-mail",
       adresse: "Indirizzo attuale",
       confirm1: "Confermo che i dati forniti sono corretti.",
-      confirm2: "Acconsento al trattamento dei miei dati nell'ambito della procedura fallimentare di SIKURA Vita SA i.L. ai sensi del GDPR.",
+      confirm2: "Acconsento al trattamento dei miei dati nell'ambito della procedura fallimentare di SIKURA Leben SA i.L. ai sensi del GDPR.",
       submit: "Invia"
     },
     en: {
@@ -31,7 +31,7 @@ function setLanguage(lang) {
       email: "Email address",
       adresse: "Current Address",
       confirm1: "I confirm that the provided data is correct.",
-      confirm2: "I consent to the processing of my data in the context of the bankruptcy proceedings of SIKURA Life AG i.L. in accordance with GDPR.",
+      confirm2: "I consent to the processing of my data in the context of the bankruptcy proceedings of SIKURA Leben AG i.L. in accordance with GDPR.",
       submit: "Submit"
     }
   };
