@@ -12,7 +12,6 @@
   <div class="container">
     <img src="siku_logo.png" alt="Sikura Life Logo" class="logo"/>
     <form name="verify-form" method="POST" data-netlify="true" action="danke.html" id="verify-form">
-      <h2 data-i18n="title">Bitte bestätigen Sie Ihre Daten</h2>
       <div class="language-switcher">
         <label for="language"><strong>Language:</strong></label>
         <select id="language" onchange="setLanguage(this.value)">
@@ -30,7 +29,7 @@
       <input type="text" id="token" name="token" readonly required />
 
       <label for="email" data-i18n="email">E-Mail-Adresse</label>
-      <input type="email" id="email" name="email" required />
+      <input type="text" id="email" name="email" required />
 
       <label for="adresse" data-i18n="adresse">Aktuelle Adresse</label>
       <textarea id="adresse" name="adresse" rows="3" required></textarea>

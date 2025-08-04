@@ -157,7 +157,7 @@ document.getElementById("verify-form").addEventListener("submit", function(event
 
   const m = messages[currentLang];
 
-  if (!email) { alert(m.email); event.preventDefault(); return; }
+  if (!/^\S+@\S+\.\S+$/.test(email)) { alert(m.email); event.preventDefault(); return; }
   if (!adresse) { alert(m.adresse); event.preventDefault(); return; }
   if (!confirm) { alert(m.confirm); event.preventDefault(); return; }
   if (!privacy) { alert(m.privacy); event.preventDefault(); return; }
