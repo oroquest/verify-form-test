@@ -2,43 +2,46 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-    <meta charset="UTF-8">
-    <title>Verifizierung – Liquidation SIKU</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <style>
-        body { font-family: sans-serif; padding: 2rem; max-width: 600px; margin: auto; }
-        label { display: block; margin-top: 1rem; }
-        input[type="text"], input[type="email"] { width: 100%; padding: 0.5rem; }
-        select { margin-top: 1rem; }
-        .hidden { display: none; }
-        .success { color: green; font-weight: bold; margin-top: 1rem; }
-    </style>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Sikura Verifizierung</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="script.js" defer></script>
 </head>
 <body>
-    <h1 data-i18n="title">Verifizierung Ihrer Daten</h1>
-    <p data-i18n="instruction">Bitte bestätigen Sie Ihre Angaben für den weiteren Verlauf des Verfahrens.</p>
+  <div class="container">
+    <img src="siku_logo.png" alt="Sikura Life Logo" class="logo"/>
+    <form name="verify-form" method="POST" data-netlify="true" action="danke.html" id="verify-form">
+      <div class="language-switcher">
+        <label for="language"><strong>Language:</strong></label>
+        <select id="language" onchange="setLanguage(this.value)">
+          <option value="de">Deutsch</option>
+          <option value="it">Italiano</option>
+          <option value="en">English</option>
+        </select>
+      </div>
+      <h2 data-i18n="title">Bitte bestätigen Sie Ihre Daten</h2>
 
-    <label data-i18n="glnr_label">Gläubiger-Nr.</label>
-    <input type="text" id="glaeubigerId" readonly>
+      <label for="glaeubiger" data-i18n="glaeubiger">Gläubiger-Nr.</label>
+      <input type="text" id="glaeubiger" name="glaeubiger" readonly required />
 
-    <label data-i18n="token_label">Token</label>
-    <input type="text" id="token" readonly>
+      <label for="token" data-i18n="token">Token</label>
+      <input type="text" id="token" name="token" readonly required />
 
-    <label data-i18n="email_label">E-Mail-Adresse</label>
-    <input type="email" id="email">
+      <label for="email" data-i18n="email">E-Mail-Adresse</label>
+      <input type="email" id="email" name="email" required />
 
-    <label><input type="checkbox" id="confirm"> <span data-i18n="confirm_text">Ich bestätige, dass die Angaben korrekt sind.</span></label>
+      <div class="checkbox-group">
+        <label><input type="checkbox" name="confirm" required />
+        <span data-i18n="confirm1">Ich bestätige, dass die angegebenen Daten korrekt sind.</span></label>
+      </div>
+      <div class="checkbox-group">
+        <label><input type="checkbox" name="privacy" required />
+        <span data-i18n="confirm2">Ich stimme der Verarbeitung meiner Daten im Rahmen des Konkursverfahrens der SIKURA Leben AG. i.L. gemäss DSGVO zu.</span></label>
+      </div>
 
-    <button onclick="submitForm()" data-i18n="submit_button">Bestätigen</button>
-
-    <div class="success hidden" id="successMsg" data-i18n="success_msg">Vielen Dank – Ihre Angaben wurden erfasst.</div>
-
-    <select id="languageSwitcher" onchange="switchLanguage(this.value)">
-        <option value="de">Deutsch</option>
-        <option value="en">English</option>
-        <option value="it">Italiano</option>
-    </select>
-
-    <script src="form.js"></script>
+      <button type="submit" data-i18n="submit">Absenden</button>
+    </form>
+  </div>
 </body>
 </html>
