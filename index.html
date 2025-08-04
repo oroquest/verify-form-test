@@ -11,16 +11,16 @@
 <body>
   <div class="container">
     <img src="siku_logo.png" alt="Sikura Life Logo" class="logo"/>
+    <h2 data-i18n="title">Bitte bestätigen Sie Ihre Daten</h2>
+
     <form name="verify-form" method="POST" data-netlify="true" action="danke.html" id="verify-form">
       <div class="language-switcher">
-        <label for="language"><strong>Language:</strong></label>
         <select id="language" onchange="setLanguage(this.value)">
           <option value="de">Deutsch</option>
           <option value="it">Italiano</option>
           <option value="en">English</option>
         </select>
       </div>
-      <h2 data-i18n="title">Bitte bestätigen Sie Ihre Daten</h2>
 
       <label for="glaeubiger" data-i18n="glaeubiger">Gläubiger-Nr.</label>
       <input type="text" id="glaeubiger" name="glaeubiger" readonly required />
@@ -35,12 +35,16 @@
       <textarea id="adresse" name="adresse" rows="3" required></textarea>
 
       <div class="checkbox-group">
-        <label><input type="checkbox" name="confirm" required />
-        <span data-i18n="confirm1">Ich bestätige, dass die angegebenen Daten korrekt sind.</span></label>
+        <label data-i18n="confirm1">
+          <input type="checkbox" name="confirm" required />
+          Ich bestätige, dass die angegebenen Daten korrekt sind.
+        </label>
       </div>
       <div class="checkbox-group">
-        <label><input type="checkbox" name="privacy" required />
-        <span data-i18n="confirm2">Ich stimme der Verarbeitung meiner Daten im Rahmen des Konkursverfahrens der SIKURA Leben AG. i.L. gemäss DSGVO zu.</span></label>
+        <label data-i18n="confirm2">
+          <input type="checkbox" name="privacy" required />
+          Ich stimme der Verarbeitung meiner Daten im Rahmen des Konkursverfahrens der SIKURA Leben AG. i.L. gemäss DSGVO zu.
+        </label>
       </div>
 
       <button type="submit" data-i18n="submit">Absenden</button>
