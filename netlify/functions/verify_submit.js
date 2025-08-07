@@ -22,8 +22,8 @@ exports.handler = async (event) => {
   const link = `https://${host}/.netlify/functions/verify_check?id=${encodeURIComponent(email)}&token=${token}`;
 
   try {
-    // Kontaktfelder aktualisieren (ohne /data)
-    const respUpdate = await fetch(`https://api.mailjet.com/v3/REST/contactdata/${encodeURIComponent(email)}`, {
+    // 1) Update contact properties
+    const respUpdate = await fetch(`https://api.mailjet.com/v3/REST/contactdata/${encodeURIComponent(email)}/data`, {
       method: 'POST',
       headers: { 'Authorization': mjAuth, 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -37,9 +37,9 @@ exports.handler = async (event) => {
         ]
       })
     });
-    if (!respUpdate.ok) return { statusCode: 500, body: `Mailjet update failed: ${await respUpdate.text()}` };
+    if (!respUpdate.ok) { return { statusCode: 500, body: `Mailjet update failed: ${await respUpdate.text()}` }; }
 
-    // Bestätigungsmail senden
+    // 2) Send confirmation email
     const respMail = await fetch('https://api.mailjet.com/v3.1/send', {
       method: 'POST',
       headers: { 'Authorization': mjAuth, 'Content-Type': 'application/json' },
@@ -52,7 +52,7 @@ exports.handler = async (event) => {
         }]
       })
     });
-    if (!respMail.ok) return { statusCode: 500, body: `Mail send failed: ${await respMail.text()}` };
+    if (!respMail.ok) { return { statusCode: 500, body: `Mail send failed: ${await respMail.text()}` }; }
 
     return { statusCode: 200, body: JSON.stringify({ message: 'OK' }) };
   } catch (e) {

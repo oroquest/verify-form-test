@@ -10,7 +10,7 @@ exports.handler = async (event) => {
     const resp = await fetch(`https://api.mailjet.com/v3/REST/contactdata/${encodeURIComponent(id)}/data`, {
       headers: { 'Authorization': mjAuth }
     });
-    if (!resp.ok) return { statusCode: 500, body: `Mailjet fetch failed: ${await resp.text()}` };
+    if (!resp.ok) { return { statusCode: 500, body: `Mailjet fetch failed: ${await resp.text()}` }; }
 
     const body = await resp.json();
     const list = body.Data || [];
