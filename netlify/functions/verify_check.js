@@ -1,43 +1,24 @@
-const mailjet = require('node-mailjet').connect(
-  process.env.MJ_APIKEY_PUBLIC,
-  process.env.MJ_APIKEY_PRIVATE
-);
+const MJ_PUBLIC = process.env.MJ_APIKEY_PUBLIC;
+const MJ_PRIVATE = process.env.MJ_APIKEY_PRIVATE;
+const mjAuth = 'Basic ' + Buffer.from(`${MJ_PUBLIC}:${MJ_PRIVATE}`).toString('base64');
 
 exports.handler = async (event) => {
-  const { id, token } = event.queryStringParameters;
-
-  if (!id || !token) {
-    return {
-      statusCode: 400,
-      body: 'Fehlender Parameter'
-    };
-  }
+  const { id, token } = event.queryStringParameters || {};
+  if (!id || !token) return { statusCode: 400, body: 'Fehlender Parameter' };
 
   try {
-    const result = await mailjet
-      .get('contactdata', { version: 'v3' })
-      .id(id)
-      .action('data')
-      .request();
+    const resp = await fetch(`https://api.mailjet.com/v3/REST/contactdata/${encodeURIComponent(id)}/data`, {
+      headers: { 'Authorization': mjAuth }
+    });
+    if (!resp.ok) { return { statusCode: 500, body: `Mailjet fetch failed: ${await resp.text()}` }; }
 
-    const data = result.body.Data || [];
-    const storedToken = data.find(d => d.Name === 'token_verify')?.Value;
+    const body = await resp.json();
+    const list = body.Data || [];
+    const stored = (list.find(d => d.Name === 'token_verify') || {}).Value;
 
-    if (storedToken !== token) {
-      return {
-        statusCode: 401,
-        body: 'Token ungültig oder abgelaufen.'
-      };
-    }
-
-    return {
-      statusCode: 200,
-      body: `✔️ E-Mail erfolgreich verifiziert.`
-    };
-  } catch (err) {
-    return {
-      statusCode: 500,
-      body: 'Fehler beim Prüfen des Tokens.'
-    };
+    if (stored !== token) return { statusCode: 401, body: 'Token ungültig oder abgelaufen.' };
+    return { statusCode: 200, body: '✔️ E‑Mail erfolgreich verifiziert.' };
+  } catch (e) {
+    return { statusCode: 500, body: `Fehler beim Prüfen des Tokens: ${e.message}` };
   }
 };

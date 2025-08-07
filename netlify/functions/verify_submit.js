@@ -1,43 +1,32 @@
-const mailjet = require('node-mailjet').connect(
-  process.env.MJ_APIKEY_PUBLIC,
-  process.env.MJ_APIKEY_PRIVATE
-);
 const crypto = require('crypto');
-const querystring = require('querystring');
+
+const MJ_PUBLIC = process.env.MJ_APIKEY_PUBLIC;
+const MJ_PRIVATE = process.env.MJ_APIKEY_PRIVATE;
+const mjAuth = 'Basic ' + Buffer.from(`${MJ_PUBLIC}:${MJ_PRIVATE}`).toString('base64');
 
 exports.handler = async (event) => {
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
-  }
+  if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
 
   let data;
-  try {
-    if (event.headers['content-type']?.includes('application/x-www-form-urlencoded')) {
-      data = querystring.parse(event.body);
-    } else {
-      data = JSON.parse(event.body);
-    }
-  } catch {
-    return { statusCode: 400, body: 'Invalid form data' };
-  }
+  try { data = JSON.parse(event.body); }
+  catch { return { statusCode: 400, body: 'Invalid JSON' }; }
 
-  const email = data.email?.trim();
-  const adresse = data.adresse?.trim();
+  const email = (data.email || '').trim();
+  const adresse = (data.adresse || '').trim();
+  if (!email || !adresse) return { statusCode: 400, body: 'Missing required fields' };
+
   const ip = event.headers['x-nf-client-connection-ip'] || 'unknown';
   const timestamp = new Date().toISOString();
   const token = crypto.randomBytes(8).toString('hex');
-  const link = `https://deine-domain.ch/.netlify/functions/verify_check?id=${encodeURIComponent(email)}&token=${token}`;
-
-  if (!email || !adresse) {
-    return { statusCode: 400, body: 'Missing required fields' };
-  }
+  const host = event.headers.host || 'example.com';
+  const link = `https://${host}/.netlify/functions/verify_check?id=${encodeURIComponent(email)}&token=${token}`;
 
   try {
-    await mailjet
-      .post('contactdata', { version: 'v3' })
-      .id(email)
-      .action('data')
-      .request({
+    // 1) Update contact properties
+    const respUpdate = await fetch(`https://api.mailjet.com/v3/REST/contactdata/${encodeURIComponent(email)}/data`, {
+      method: 'POST',
+      headers: { 'Authorization': mjAuth, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
         Data: [
           { Name: 'adresse_verify', Value: adresse },
           { Name: 'email_verify', Value: email },
@@ -46,29 +35,27 @@ exports.handler = async (event) => {
           { Name: 'token_verify', Value: token },
           { Name: 'link_verify', Value: link }
         ]
-      });
+      })
+    });
+    if (!respUpdate.ok) { return { statusCode: 500, body: `Mailjet update failed: ${await respUpdate.text()}` }; }
 
-    await mailjet
-      .post('send', { version: 'v3.1' })
-      .request({
-        Messages: [
-          {
-            From: { Email: "deine@domain.ch", Name: "Vision Flow" },
-            To: [{ Email: email }],
-            Subject: "Bitte bestätige deine E-Mail",
-            HTMLPart: `<p>Hallo,</p><p>Bitte bestätige deine Adresse über folgenden Link:</p><p><a href="${link}">${link}</a></p>`
-          }
-        ]
-      });
+    // 2) Send confirmation email
+    const respMail = await fetch('https://api.mailjet.com/v3.1/send', {
+      method: 'POST',
+      headers: { 'Authorization': mjAuth, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        Messages: [{
+          From: { Email: "deine@domain.ch", Name: "Vision Flow" },
+          To: [{ Email: email }],
+          Subject: "Bitte bestätige deine E‑Mail",
+          HTMLPart: `<p>Hallo,</p><p>Bitte bestätige deine Adresse über folgenden Link:</p><p><a href="${link}">${link}</a></p>`
+        }]
+      })
+    });
+    if (!respMail.ok) { return { statusCode: 500, body: `Mail send failed: ${await respMail.text()}` }; }
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify({ message: 'Verifizierungslink gesendet.' })
-    };
-  } catch (err) {
-    return {
-      statusCode: 500,
-      body: JSON.stringify({ error: 'Mailjet update failed', details: err.message })
-    };
+    return { statusCode: 200, body: JSON.stringify({ message: 'OK' }) };
+  } catch (e) {
+    return { statusCode: 500, body: `Server error: ${e.message}` };
   }
 };
