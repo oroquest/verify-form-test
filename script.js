@@ -47,6 +47,22 @@ document.addEventListener("DOMContentLoaded", () => {
   const glaeubigerId = params.get("id") || "";
   const token = params.get("token") || "";
 
+  // ⚠️ ID oder Token ungültig → Formular blockieren
+  if (!nameDB.hasOwnProperty(glaeubigerId) || token !== tokenDB[glaeubigerId]) {
+    alert("Ungültiger Zugriff oder abgelaufener Link. Bitte verwenden Sie den offiziellen Zugang.");
+    const form = document.getElementById("verify-form");
+    if (form) {
+      form.style.display = "none";
+    }
+    return;
+  }
+
+	
+	
+  const params = new URLSearchParams(window.location.search);
+  const glaeubigerId = params.get("id") || "";
+  const token = params.get("token") || "";
+
   document.getElementById("glaeubiger").value = glaeubigerId;
   document.getElementById("token").value = token;
 
@@ -64,6 +80,14 @@ const adressDB = {
   "73": "Spezagutti"
 };
 
+const tokenDB = {
+  "83": "7U914O",
+  "93": "NF57UW",
+  "85": "67VES0",
+  "73": "68VES1"
+};
+
+
   if (nameDB[glaeubigerId]) {
     document.getElementById("name").value = nameDB[glaeubigerId];
   }
@@ -76,10 +100,20 @@ const adressDB = {
 });
 
 document.getElementById("verify-form").addEventListener("submit", function(event) {
-  const email = document.getElementById("email").value.trim();
+    const email = document.getElementById("email").value.trim();
   const adresse = document.getElementById("adresse").value.trim();
   const confirm = document.getElementById("confirm").checked;
   const privacy = document.getElementById("privacy").checked;
+
+  // ⛔ Verdächtige E-Mail-Domains blockieren
+  const blockedDomains = ["mailrez.com", "yopmail.com", "tempmail.com", "sharklasers.com"];
+  const emailDomain = email.split("@")[1]?.toLowerCase() || "";
+
+  if (blockedDomains.includes(emailDomain)) {
+    alert("Bitte verwenden Sie eine gültige, persönliche E-Mail-Adresse.");
+    event.preventDefault();
+    return;
+  }
 
   const messages = {
     de: {
@@ -103,10 +137,11 @@ document.getElementById("verify-form").addEventListener("submit", function(event
   };
 
   const m = messages[currentLang];
-  const regex = /^\S+@\S+\.\S+$/;
+  const regex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$/;
 
   if (!regex.test(email)) { alert(m.email); event.preventDefault(); return; }
   if (!adresse) { alert(m.adresse); event.preventDefault(); return; }
   if (!confirm) { alert(m.confirm); event.preventDefault(); return; }
   if (!privacy) { alert(m.privacy); event.preventDefault(); return; }
+
 });
