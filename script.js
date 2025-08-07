@@ -42,55 +42,32 @@ function setLanguage(lang) {
   });
 }
 
-document.addEventListener("DOMContentLoaded", () => {
+document.addEventListener("DOMContentLoaded", async () => {
   const params = new URLSearchParams(window.location.search);
   const glaeubigerId = params.get("id") || "";
   const token = params.get("token") || "";
 
-  const adressDB = {
-    "83": "Fasano Vicenzo Via Deco' e Canetta 127 IT-24068 Seriate",
-    "93": "Fois Maurizio Via Nazario Sauro 119 IT-51100 Pistoia",
-    "85": "Frigerio Marino Via Risorgimento 18 IT-22070 Luisago (CO)",
-    "73": "Spezagutti Marta Via Spezimento 99 IT-22023 Milano"
-  };
-
-  const nameDB = {
-    "83": "Fasano",
-    "93": "Fois",
-    "85": "Frigerio",
-    "73": "Spezagutti"
-  };
-
-  const tokenDB = {
-    "83": "7U914O",
-    "93": "NF57UW",
-    "85": "67VES0",
-    "73": "68VES1"
-  };
-
-  // ⛔ Sicherheitsprüfung: nur gültige ID + passender Token
-  if (!nameDB.hasOwnProperty(glaeubigerId) || token !== tokenDB[glaeubigerId]) {
-    alert("Ungültiger Zugriff oder abgelaufener Link. Bitte verwenden Sie den offiziellen Zugang.");
-    const form = document.getElementById("verify-form");
-    if (form) {
-      form.style.display = "none";
-    }
-    return;
-  }
-
-  // ✔️ Felder befüllen
   document.getElementById("glaeubiger").value = glaeubigerId;
   document.getElementById("token").value = token;
 
-  if (nameDB[glaeubigerId]) {
-    document.getElementById("name").value = nameDB[glaeubigerId];
-  }
+  try {
+    const response = await fetch(`/.netlify/functions/verify?id=${glaeubigerId}&token=${token}`);
+    const result = await response.json();
 
-  if (adressDB[glaeubigerId]) {
-    document.getElementById("adresse").value = adressDB[glaeubigerId];
-  }
+    if (!response.ok) {
+      throw new Error(result.error || "Ungültiger Zugriff");
+    }
 
-  setLanguage(currentLang);
+    document.getElementById("name").value = result.name || "";
+    document.getElementById("adresse").value = result.adresse || "";
+
+    setLanguage(currentLang);
+
+  } catch (error) {
+    alert("Ungültiger Link oder abgelaufener Zugriff. Bitte verwenden Sie den offiziellen Zugang.");
+    const form = document.getElementById("verify-form");
+    if (form) form.style.display = "none";
+  }
 });
 
 document.getElementById("verify-form").addEventListener("submit", function(event) {
@@ -99,7 +76,6 @@ document.getElementById("verify-form").addEventListener("submit", function(event
   const confirm = document.getElementById("confirm").checked;
   const privacy = document.getElementById("privacy").checked;
 
-  // ⛔ Verdächtige E-Mail-Domains blockieren
   const blockedDomains = ["mailrez.com", "yopmail.com", "tempmail.com", "sharklasers.com"];
   const emailDomain = email.split("@")[1]?.toLowerCase() || "";
 
