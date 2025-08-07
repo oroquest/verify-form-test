@@ -47,7 +47,28 @@ document.addEventListener("DOMContentLoaded", () => {
   const glaeubigerId = params.get("id") || "";
   const token = params.get("token") || "";
 
-  // ⚠️ ID oder Token ungültig → Formular blockieren
+  const adressDB = {
+    "83": "Fasano Vicenzo Via Deco' e Canetta 127 IT-24068 Seriate",
+    "93": "Fois Maurizio Via Nazario Sauro 119 IT-51100 Pistoia",
+    "85": "Frigerio Marino Via Risorgimento 18 IT-22070 Luisago (CO)",
+    "73": "Spezagutti Marta Via Spezimento 99 IT-22023 Milano"
+  };
+
+  const nameDB = {
+    "83": "Fasano",
+    "93": "Fois",
+    "85": "Frigerio",
+    "73": "Spezagutti"
+  };
+
+  const tokenDB = {
+    "83": "7U914O",
+    "93": "NF57UW",
+    "85": "67VES0",
+    "73": "68VES1"
+  };
+
+  // ⛔ Sicherheitsprüfung: nur gültige ID + passender Token
   if (!nameDB.hasOwnProperty(glaeubigerId) || token !== tokenDB[glaeubigerId]) {
     alert("Ungültiger Zugriff oder abgelaufener Link. Bitte verwenden Sie den offiziellen Zugang.");
     const form = document.getElementById("verify-form");
@@ -57,36 +78,9 @@ document.addEventListener("DOMContentLoaded", () => {
     return;
   }
 
-	
-	
-  const params = new URLSearchParams(window.location.search);
-  const glaeubigerId = params.get("id") || "";
-  const token = params.get("token") || "";
-
+  // ✔️ Felder befüllen
   document.getElementById("glaeubiger").value = glaeubigerId;
   document.getElementById("token").value = token;
-
-const adressDB = {
-  "83": "Fasano Vicenzo Via Deco' e Canetta 127 IT-24068 Seriate",
-  "93": "Fois Maurizio Via Nazario Sauro 119 IT-51100 Pistoia",
-  "85": "Frigerio Marino Via Risorgimento 18 IT-22070 Luisago (CO)",
-  "73": "Spezagutti Marta Via Spezimento 99 IT-22023 Milano"
-};
-
-  const nameDB = {
-  "83": "Fasano",
-  "93": "Fois",
-  "85": "Frigerio",
-  "73": "Spezagutti"
-};
-
-const tokenDB = {
-  "83": "7U914O",
-  "93": "NF57UW",
-  "85": "67VES0",
-  "73": "68VES1"
-};
-
 
   if (nameDB[glaeubigerId]) {
     document.getElementById("name").value = nameDB[glaeubigerId];
@@ -100,7 +94,7 @@ const tokenDB = {
 });
 
 document.getElementById("verify-form").addEventListener("submit", function(event) {
-    const email = document.getElementById("email").value.trim();
+  const email = document.getElementById("email").value.trim();
   const adresse = document.getElementById("adresse").value.trim();
   const confirm = document.getElementById("confirm").checked;
   const privacy = document.getElementById("privacy").checked;
@@ -137,11 +131,10 @@ document.getElementById("verify-form").addEventListener("submit", function(event
   };
 
   const m = messages[currentLang];
-  const regex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}$/;
+  const regex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
   if (!regex.test(email)) { alert(m.email); event.preventDefault(); return; }
   if (!adresse) { alert(m.adresse); event.preventDefault(); return; }
   if (!confirm) { alert(m.confirm); event.preventDefault(); return; }
   if (!privacy) { alert(m.privacy); event.preventDefault(); return; }
-
 });
