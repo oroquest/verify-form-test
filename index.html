@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="de">
 <head>
@@ -6,14 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Sikura Verifizierung</title>
   <link rel="stylesheet" href="style.css">
-  <script src="script.js" defer></script>
 </head>
 <body>
   <div class="container">
     <img src="siku_logo.png" alt="Sikura Life Logo" class="logo"/>
     <h2 data-i18n="title">Bitte bestätigen Sie Ihre Daten</h2>
 
-    <form name="verify-form" method="POST" data-netlify="true" action="danke.html" id="verify-form">
+    <form name="verify-form" method="POST" action="/.netlify/functions/verify_submit" id="verify-form">
       <div class="language-switcher">
         <select id="language" onchange="setLanguage(this.value)">
           <option value="de">Deutsch</option>
@@ -22,31 +20,60 @@
         </select>
       </div>
 
-      <label for="glaeubiger" data-i18n="glaeubiger">Gläubiger-Nr.</span></label>
+      <label for="glaeubiger" data-i18n="glaeubiger">Gläubiger-Nr.</label>
       <input type="text" id="glaeubiger" name="glaeubiger" readonly required />
 
-      <label for="token" data-i18n="token">Token</span></label>
+      <label for="token" data-i18n="token">Token</label>
       <input type="text" id="token" name="token" readonly required />
 
-      <label for="name" data-i18n="name">Name</span></label>
+      <label for="name" data-i18n="name">Name</label>
       <input type="text" id="name" name="name" readonly />
 
-      <label for="email" data-i18n="email">E-Mail-Adresse</span></label>
-      <input type="text" id="email" name="email" required />
+      <label for="email" data-i18n="email">E-Mail-Adresse</label>
+      <input type="email" id="email" name="email" required />
 
-      <label for="adresse" data-i18n="adresse">Aktuelle Adresse</span></label>
+      <label for="adresse" data-i18n="adresse">Aktuelle Adresse</label>
       <textarea id="adresse" name="adresse" rows="3" required></textarea>
 
       <div class="checkbox-group">
-        <label class="checkbox-line"><input type="checkbox" id="confirm" name="confirm" /><span data-i18n="confirm1">Ich bestätige, dass die angegebenen Daten korrekt sind.</span></label>
+        <label class="checkbox-line">
+          <input type="checkbox" id="confirm" name="confirm" />
+          <span data-i18n="confirm1">Ich bestätige, dass die angegebenen Daten korrekt sind.</span>
+        </label>
       </div>
 
       <div class="checkbox-group">
-        <label class="checkbox-line"><input type="checkbox" id="privacy" name="privacy" /><span data-i18n="confirm2">Ich stimme der Verarbeitung meiner Daten im Rahmen des Konkursverfahrens der SIKURA Leben AG. i.L. gemäss DSGVO zu.</span></label>
+        <label class="checkbox-line">
+          <input type="checkbox" id="privacy" name="privacy" />
+          <span data-i18n="confirm2">
+            Ich stimme der Verarbeitung meiner Daten im Rahmen des Konkursverfahrens der SIKURA Leben AG. i.L. gemäss DSGVO zu.
+          </span>
+        </label>
       </div>
 
       <button type="submit" data-i18n="submit">Absenden</button>
     </form>
   </div>
+
+  <script>
+    document.getElementById("verify-form").addEventListener("submit", async function (e) {
+      e.preventDefault();
+      const form = e.target;
+      const data = new FormData(form);
+      const json = Object.fromEntries(data.entries());
+
+      const response = await fetch("/.netlify/functions/verify_submit", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(json),
+      });
+
+      if (response.ok) {
+        window.location.href = "danke.html";
+      } else {
+        alert("Fehler beim Senden des Formulars.");
+      }
+    });
+  </script>
 </body>
 </html>
