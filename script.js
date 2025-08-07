@@ -51,15 +51,15 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("token").value = token;
 
   const adressDB = {
-  "83": "Fasano Vicenzo Via Deco' e Canetta  127 IT-24068 Seriate"
-  "93": "Fois Maurizio Via Nazario Sauro 119 IT-51100 Pistoia"
-  "85": "Frigerio Marino Via Risorgimento 18 IT-22070 Luisago (CO)"
+    "83": "Fasano Vicenzo Via Deco' e Canetta  127 IT-24068 Seriate"
+    "93": "Fois Maurizio Via Nazario Sauro 119 IT-51100 Pistoia"
+    "85": "Frigerio Marino Via Risorgimento 18 IT-22070 Luisago (CO)"
   };
 
   const nameDB = {
-  "83": "Fasano"
-  "93": "Fois"
-  "85": "Frigerio"
+    "83": "Fasano"
+    "93": "Fois"
+    "85": "Frigerio"
   };
 
   if (nameDB[glaeubigerId]) {
