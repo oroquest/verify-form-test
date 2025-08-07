@@ -22,13 +22,12 @@ exports.handler = async (event) => {
   const link = `https://${host}/.netlify/functions/verify_check?id=${encodeURIComponent(email)}&token=${token}`;
 
   try {
-    // Schritt 1: Existiert der Kontakt?
+    // Schritt 1: Kontakt anlegen, falls nicht vorhanden
     const getResp = await fetch(`https://api.mailjet.com/v3/REST/contact/${encodeURIComponent(email)}`, {
       headers: { Authorization: mjAuth }
     });
 
     if (getResp.status === 404) {
-      // Kontakt anlegen
       const createResp = await fetch('https://api.mailjet.com/v3/REST/contact', {
         method: 'POST',
         headers: { Authorization: mjAuth, 'Content-Type': 'application/json' },
@@ -40,9 +39,9 @@ exports.handler = async (event) => {
       }
     }
 
-    // Schritt 2: Kontakt-Datenfelder aktualisieren
-    const updateResp = await fetch(`https://api.mailjet.com/v3/REST/contact/${encodeURIComponent(email)}/data`, {
-      method: 'POST',
+    // Schritt 2: Kontakt-Properties aktualisieren (korrekte Route & Methode)
+    const updateResp = await fetch(`https://api.mailjet.com/v3/REST/contactdata/${encodeURIComponent(email)}`, {
+      method: 'PUT',
       headers: { Authorization: mjAuth, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         Data: [
@@ -55,12 +54,13 @@ exports.handler = async (event) => {
         ]
       })
     });
+
     if (!updateResp.ok) {
       const t = await updateResp.text();
       return { statusCode: 500, body: `Mailjet update failed: ${t}` };
     }
 
-    // Schritt 3: Bestätigungs-Mail senden
+    // Schritt 3: Bestätigungsmail senden
     const respMail = await fetch('https://api.mailjet.com/v3.1/send', {
       method: 'POST',
       headers: { 'Authorization': mjAuth, 'Content-Type': 'application/json' },
@@ -73,6 +73,7 @@ exports.handler = async (event) => {
         }]
       })
     });
+
     if (!respMail.ok) {
       const t = await respMail.text();
       return { statusCode: 500, body: `Mail send failed: ${t}` };
