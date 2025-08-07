@@ -51,15 +51,15 @@ document.addEventListener("DOMContentLoaded", () => {
   document.getElementById("token").value = token;
 
   const adressDB = {
-    "83": "Fasano Vicenzo Via Deco' e Canetta  127 IT-24068 Seriate"
-    "93": "Fois Maurizio Via Nazario Sauro 119 IT-51100 Pistoia"
-    "85": "Frigerio Marino Via Risorgimento 18 IT-22070 Luisago (CO)"
+    "52": "Frazione Gracchia 37/A IT-50030 Barberino",
+    "53": "Via F.lli Cervi 56/F IT-47814 Bellaria",
+    "54": "Via Gorizia 3 IT-20010 Pogliano"
   };
 
   const nameDB = {
-    "83": "Fasano"
-    "93": "Fois"
-    "85": "Frigerio"
+    "52": "Irene Bartolini",
+    "53": "Iryna Basaraba",
+    "54": "Luigi Bassetti"
   };
 
   if (nameDB[glaeubigerId]) {
