@@ -1,35 +1,42 @@
 
-exports.handler = async (event, context) => {
-  const query = event.queryStringParameters;
-  const id = query.id;
-  const token = query.token;
+// verify.js – erweitert mit Einmal-Nutzungsschutz
+const tokenDB = require("./tokenDB");
+const fs = require("fs");
+const path = require("path");
 
-  // Datenbank: intern gespeicherte Zuordnungen
-  const data = {
-    "83": { token: "aVKe-XPu3i4cKRqn", name: "Fasano", adresse: "Fasano Vicenzo Via Deco' e Canetta 127 IT-24068 Seriate" },
-    "93": { token: "1-EOyOuGsZ-JH35G", name: "Fois", adresse: "Fois Maurizio Via Nazario Sauro 119 IT-51100 Pistoia" },
-    "85": { token: "zIPT9R6jdkxTNHPV", name: "Frigerio", adresse: "Frigerio Marino Via Risorgimento 18 IT-22070 Luisago (CO)" },
-    "73": { token: "MQ1zaDyA9Z0YLYq6", name: "Spezagutti", adresse: "Spezagutti Marta Via Spezimento 99 IT-22023 Milano" }
-  };
+const USED_TOKENS_PATH = path.resolve(__dirname, "used_tokens.json");
 
-  // ID oder Token fehlt
+exports.handler = async function(event, context) {
+  const { id, token } = event.queryStringParameters || {};
+
   if (!id || !token) {
     return {
       statusCode: 400,
-      body: JSON.stringify({ error: "Missing parameters" })
+      body: JSON.stringify({ error: "Missing ID or token." })
     };
   }
 
-  // Kein Eintrag oder falscher Token
-  const entry = data[id];
+  const entry = tokenDB[id];
   if (!entry || entry.token !== token) {
     return {
       statusCode: 403,
-      body: JSON.stringify({ error: "Invalid ID or token" })
+      body: JSON.stringify({ error: "Invalid token or ID." })
     };
   }
 
-  // Erfolg: sende Name + Adresse zurück
+  // Prüfen, ob der Token bereits verwendet wurde
+  let usedTokens = {};
+  if (fs.existsSync(USED_TOKENS_PATH)) {
+    usedTokens = JSON.parse(fs.readFileSync(USED_TOKENS_PATH, "utf-8"));
+  }
+
+  if (usedTokens[token]) {
+    return {
+      statusCode: 410,
+      body: JSON.stringify({ error: "Token has already been used." })
+    };
+  }
+
   return {
     statusCode: 200,
     body: JSON.stringify({
