@@ -12,14 +12,24 @@ exports.handler = async function (event, context) {
 
   try {
     const body = JSON.parse(event.body);
-    const { id, token, email } = body;
+    let { id, token, email } = body;
+
+    console.log("Incoming ID:", id);
+    console.log("Incoming Token:", token);
+
+    token = token.trim(); // Sicherheitskorrektur
 
     if (!id || !token || !email) {
+      console.error("Missing parameters:", { id, token, email });
       return { statusCode: 400, body: "Missing parameters" };
     }
 
     const entry = tokenDB[id];
+
+    console.log("DB Entry:", entry);
+
     if (!entry || entry.token !== token) {
+      console.error("Invalid token or ID", { id, token, entry });
       return { statusCode: 403, body: "Invalid token or ID" };
     }
 
@@ -29,6 +39,7 @@ exports.handler = async function (event, context) {
     }
 
     if (usedTokens[token]) {
+      console.warn("Token already used:", token);
       return { statusCode: 410, body: "Token already used" };
     }
 
@@ -40,6 +51,8 @@ exports.handler = async function (event, context) {
     };
 
     fs.writeFileSync(USED_TOKENS_PATH, JSON.stringify(usedTokens, null, 2));
+
+    console.log("Token saved successfully:", token);
 
     return {
       statusCode: 200,
