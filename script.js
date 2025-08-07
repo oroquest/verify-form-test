@@ -1,5 +1,4 @@
 
-// script.js mit Einmal-Schutz über Netlify Function
 let currentLang = "de";
 
 function setLanguage(lang) {
@@ -43,13 +42,10 @@ function setLanguage(lang) {
   });
 }
 
-let glaeubigerId = "";
-let token = "";
-
 document.addEventListener("DOMContentLoaded", async () => {
   const params = new URLSearchParams(window.location.search);
-  glaeubigerId = params.get("id") || "";
-  token = params.get("token") || "";
+  const glaeubigerId = params.get("id") || "";
+  const token = params.get("token") || "";
 
   document.getElementById("glaeubiger").value = glaeubigerId;
   document.getElementById("token").value = token;
@@ -64,6 +60,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     document.getElementById("name").value = result.name || "";
     document.getElementById("adresse").value = result.adresse || "";
+
     setLanguage(currentLang);
 
   } catch (error) {
@@ -74,8 +71,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 document.getElementById("verify-form").addEventListener("submit", function(event) {
-  event.preventDefault();
-
   const email = document.getElementById("email").value.trim();
   const adresse = document.getElementById("adresse").value.trim();
   const confirm = document.getElementById("confirm").checked;
@@ -83,6 +78,12 @@ document.getElementById("verify-form").addEventListener("submit", function(event
 
   const blockedDomains = ["mailrez.com", "yopmail.com", "tempmail.com", "sharklasers.com"];
   const emailDomain = email.split("@")[1]?.toLowerCase() || "";
+
+  if (blockedDomains.includes(emailDomain)) {
+    alert("Bitte verwenden Sie eine gültige, persönliche E-Mail-Adresse.");
+    event.preventDefault();
+    return;
+  }
 
   const messages = {
     de: {
@@ -108,32 +109,8 @@ document.getElementById("verify-form").addEventListener("submit", function(event
   const m = messages[currentLang];
   const regex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
 
-  if (!regex.test(email)) { alert(m.email); return; }
-  if (!adresse) { alert(m.adresse); return; }
-  if (!confirm) { alert(m.confirm); return; }
-  if (!privacy) { alert(m.privacy); return; }
-
-  // Formular absenden an Netlify Function (Token sperren)
-  fetch('/.netlify/functions/submit', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      id: glaeubigerId,
-      token: token,
-      email: email
-    })
-  })
-  .then(res => res.json())
-  .then(result => {
-    if (result.success) {
-      alert("Danke. Ihre Angaben wurden erfolgreich gespeichert.");
-      window.location.href = "danke.html";
-    } else {
-      alert("Ihre Daten konnten nicht gespeichert werden. Eventuell wurde der Link bereits verwendet.");
-    }
-  })
-  .catch(err => {
-    console.error(err);
-    alert("Ein Fehler ist aufgetreten. Bitte versuchen Sie es erneut.");
-  });
+  if (!regex.test(email)) { alert(m.email); event.preventDefault(); return; }
+  if (!adresse) { alert(m.adresse); event.preventDefault(); return; }
+  if (!confirm) { alert(m.confirm); event.preventDefault(); return; }
+  if (!privacy) { alert(m.privacy); event.preventDefault(); return; }
 });
