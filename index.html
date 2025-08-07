@@ -13,7 +13,8 @@
     <img src="siku_logo.png" alt="Sikura Life Logo" class="logo"/>
     <h2 data-i18n="title">Bitte bestätigen Sie Ihre Daten</h2>
 
-    <form name="verify-form" method="POST" data-netlify="true" action="danke.html" id="verify-form">
+	<form name="verify-form" method="POST" action="/.netlify/functions/verify_submit" id="verify-form">
+
       <div class="language-switcher">
         <select id="language" onchange="setLanguage(this.value)">
           <option value="de">Deutsch</option>
@@ -48,5 +49,26 @@
       <button type="submit" data-i18n="submit">Absenden</button>
     </form>
   </div>
+  <script>
+  document.getElementById("verify-form").addEventListener("submit", async function (e) {
+    e.preventDefault();
+    const form = e.target;
+    const data = new FormData(form);
+    const json = Object.fromEntries(data.entries());
+
+    const response = await fetch("/.netlify/functions/verify_submit", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(json),
+    });
+
+    if (response.ok) {
+      window.location.href = "danke.html";
+    } else {
+      alert("Fehler beim Senden des Formulars.");
+    }
+  });
+</script>
+
 </body>
 </html>
