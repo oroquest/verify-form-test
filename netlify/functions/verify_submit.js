@@ -39,7 +39,7 @@ exports.handler = async (event) => {
       }
     }
 
-    // Schritt 2: Kontakt-Properties aktualisieren (korrekte Route & Methode)
+    // Schritt 2: Kontakt-Properties aktualisieren
     const updateResp = await fetch(`https://api.mailjet.com/v3/REST/contactdata/${encodeURIComponent(email)}`, {
       method: 'PUT',
       headers: { Authorization: mjAuth, 'Content-Type': 'application/json' },
@@ -60,27 +60,39 @@ exports.handler = async (event) => {
       return { statusCode: 500, body: `Mailjet update failed: ${t}` };
     }
 
-    // Schritt 3: Bestätigungsmail senden
+    // Schritt 3: Bestätigungs-Mail senden
     const respMail = await fetch('https://api.mailjet.com/v3.1/send', {
       method: 'POST',
-      headers: { 'Authorization': mjAuth, 'Content-Type': 'application/json' },
+      headers: {
+        'Authorization': mjAuth,
+        'Content-Type': 'application/json'
+      },
       body: JSON.stringify({
-        Messages: [{
-          From: { Email: "deine@domain.ch", Name: "Vision Flow" },
-          To: [{ Email: email }],
-          Subject: "Bitte bestätige deine E‑Mail",
-          HTMLPart: `<p>Hallo,</p><p>Bitte bestätige deine Adresse über folgenden Link:</p><p><a href="${link}">${link}</a></p>`
-        }]
+        Messages: [
+          {
+            From: { Email: "noreply@sikuralife.com", Name: "Sikura Life Verifizierung" },
+            ReplyTo: { Email: "support@sikuralife.com", Name: "Sikura Support" },
+            To: [{ Email: email }],
+            Subject: "Bitte bestätige deine E-Mail-Adresse",
+            HTMLPart: `
+              <p>Hallo,</p>
+              <p>bitte bestätige deine E-Mail-Adresse und die angegebene Adresse über folgenden Link:</p>
+              <p><a href="${link}">${link}</a></p>
+              <p>Adresse: ${adresse}</p>
+              <p>Falls du diese Anfrage nicht gestellt hast, ignoriere diese E-Mail.</p>
+            `
+          }
+        ]
       })
     });
 
+    const mailText = await respMail.text();
     if (!respMail.ok) {
-      const t = await respMail.text();
-      return { statusCode: 500, body: `Mail send failed: ${t}` };
+      return { statusCode: 500, body: `Mail send failed: ${mailText}` };
     }
 
-    return { statusCode: 200, body: JSON.stringify({ message: 'OK' }) };
-  } catch (e) {
-    return { statusCode: 500, body: `Server error: ${e.message}` };
+    return { statusCode: 200, body: JSON.stringify({ success: true }) };
+  } catch (err) {
+    return { statusCode: 500, body: `Server Error: ${err.message}` };
   }
 };
