@@ -88,7 +88,7 @@
       <div class="row">
         <div style="max-width:200px;">
           <label for="plz" id="lbl-plz">PLZ</label>
-          <input type="text" id="plz" name="plz" required inputmode="numeric" />
+          <input type="text" id="plz" name="plz" required inputmode="numeric" pattern="\d*" autocomplete="postal-code" />
           <div class="hint" id="hint-plz"></div>
           <div class="field-error" id="err-plz"></div>
         </div>
@@ -311,16 +311,45 @@
       if (errEl) { errEl.textContent = ""; errEl.style.display = 'none'; }
     }
 
-    // Sanitize PLZ on input: keep only digits, remove whitespace/newlines/letters
+    // Harden PLZ: block non-digits at the source (typing, paste, drop), plus sanitize
     document.addEventListener('DOMContentLoaded', () => {
       const plzEl = document.getElementById('plz');
+
+      // Block non-digits before they get in
+      plzEl.addEventListener('beforeinput', (e) => {
+        if (e.inputType === 'insertFromPaste' || e.inputType === 'insertFromDrop') return; // handled separately
+        if (typeof e.data === 'string' && /\D/.test(e.data)) {
+          e.preventDefault();
+        }
+      });
+
+      // Sanitize on input (covers paste in many browsers)
       plzEl.addEventListener('input', (e) => {
-        const cleaned = e.target.value.replace(/\\D+/g, '');
+        const cleaned = e.target.value.replace(/\D+/g, '');
         if (e.target.value !== cleaned) e.target.value = cleaned;
       });
-      plzEl.addEventListener('blur', (e) => {
-        const cleaned = e.target.value.replace(/\\D+/g, '');
-        if (e.target.value !== cleaned) e.target.value = cleaned;
+
+      // Clean pasted content
+      plzEl.addEventListener('paste', (e) => {
+        e.preventDefault();
+        const text = (e.clipboardData || window.clipboardData).getData('text');
+        const onlyDigits = String(text).replace(/\D+/g, '');
+        document.execCommand('insertText', false, onlyDigits);
+      });
+
+      // Prevent dropping non-text or any non-digit text
+      plzEl.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const text = (e.dataTransfer && e.dataTransfer.getData('text')) || '';
+        const onlyDigits = String(text).replace(/\D+/g, '');
+        if (onlyDigits) plzEl.value = plzEl.value + onlyDigits;
+        plzEl.dispatchEvent(new Event('input', { bubbles: true }));
+      });
+
+      // Also sanitize on blur
+      plzEl.addEventListener('blur', () => {
+        const cleaned = plzEl.value.replace(/\D+/g, '');
+        if (plzEl.value !== cleaned) plzEl.value = cleaned;
       });
     });
 
@@ -426,9 +455,9 @@
 
       if (id === 'plz') {
         // sanitize again just in case
-        v = v.replace(/\\D+/g, '');
+        v = v.replace(/\D+/g, '');
         if (el.value !== v) el.value = v;
-        if (!/^\\d+$/.test(v)) { showError('plz','errDigits'); return false; }
+        if (!/^\d+$/.test(v)) { showError('plz','errDigits'); return false; }
         const cc = normalizeCountry(document.getElementById('country').value);
         if (cc === 'CH' && v.length !== 4) { showError('plz','errZIPLenCH'); return false; }
         if (cc === 'LI' && v.length !== 4) { showError('plz','errZIPLenLI'); return false; }
