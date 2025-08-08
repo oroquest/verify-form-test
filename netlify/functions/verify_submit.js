@@ -1,125 +1,158 @@
+// Secure verify_submit: validates id+token from referer (or body), decodes email from body or Base64URL 'em' param,
+// checks against Mailjet contact properties, then updates address fields. Test-mode keeps expiry lenient.
 const crypto = require('crypto');
 
 const MJ_PUBLIC = process.env.MJ_APIKEY_PUBLIC;
 const MJ_PRIVATE = process.env.MJ_APIKEY_PRIVATE;
 const mjAuth = 'Basic ' + Buffer.from(`${MJ_PUBLIC}:${MJ_PRIVATE}`).toString('base64');
 
-// Testmodus-Schalter: true = abgelaufene Tokens werden NICHT blockiert (nur Hinweis)
-const TEST_MODE = true;
-// Ablauf in Tagen
-const TOKEN_EXPIRY_DAYS = 7;
+const TEST_MODE = true;           // in PROD set to false
+const ENFORCE_EXPIRY = false;     // in PROD set to true
+
+function parseFormBody(event) {
+  const ct = (event.headers['content-type'] || event.headers['Content-Type'] || '').toLowerCase();
+  if (ct.includes('application/json')) {
+    try { return JSON.parse(event.body || '{}'); } catch { return {}; }
+  }
+  // x-www-form-urlencoded
+  try {
+    const params = new URLSearchParams(event.body || '');
+    const obj = {};
+    for (const [k, v] of params.entries()) obj[k] = v;
+    return obj;
+  } catch {
+    return {};
+  }
+}
+
+function b64urlDecode(input) {
+  if (!input) return '';
+  let s = String(input).replace(/-/g, '+').replace(/_/g, '/');
+  while (s.length % 4 !== 0) s += '=';
+  try { return Buffer.from(s, 'base64').toString('utf8'); } catch { return ''; }
+}
+
+function getIdTokenFromReferer(event) {
+  const ref = event.headers.referer || event.headers.Referer || '';
+  if (!ref) return {};
+  try {
+    const u = new URL(ref);
+    const id = u.searchParams.get('id') || '';
+    const token = u.searchParams.get('token') || '';
+    const em = u.searchParams.get('em') || '';
+    const lang = (u.searchParams.get('lang') || '').toLowerCase();
+    return { id, token, em, lang };
+  } catch {
+    return {};
+  }
+}
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
 
-  let data;
-  try { data = JSON.parse(event.body); }
-  catch { return { statusCode: 400, body: 'Invalid JSON' }; }
+  const body = parseFormBody(event);
+  // Prefer hidden fields; fallback to referer params
+  const ref = getIdTokenFromReferer(event);
 
-  const email = (data.email || '').trim();
-  // Neue Adress-Felder (bearbeitbar, Pflicht im Frontend)
-  const glaeubiger = (data.glaeubiger || '').trim();
-  const firstname = (data.firstname || '').trim();
-  const name = (data.name || '').trim();
-  const strasse = (data.strasse || '').trim();
-  const hausnummer = (data.hausnummer || '').trim();
-  const plz = (data.plz || '').trim();
-  const ort = (data.ort || '').trim();
-  const country = (data.country || '').trim();
+  const id = (body.id || ref.id || '').trim();           // creditor number
+  const token = (body.token || ref.token || '').trim();   // verify token
+  const em = (body.em || ref.em || '').trim();            // Base64URL email (optional)
+  const lang = (body.lang || ref.lang || 'de').toLowerCase();
 
-  if (!email) return { statusCode: 400, body: 'Missing required field: email' };
+  let email = (body.email || '').trim();
+  if (!email && em) email = b64urlDecode(em).trim();
 
-  const ip = event.headers['x-nf-client-connection-ip'] || 'unknown';
+  if (!email || !id || !token) {
+    return { statusCode: 400, body: 'Missing required parameters (email/id/token)' };
+  }
+
+  const ip = event.headers['x-nf-client-connection-ip'] || event.headers['x-forwarded-for'] || 'unknown';
   const timestamp = new Date().toISOString();
-  const token = crypto.randomBytes(16).toString('hex'); // 32 hex-Zeichen
-  const expiryDate = new Date(Date.now() + TOKEN_EXPIRY_DAYS*24*60*60*1000).toISOString();
-
-  const host = event.headers.host || 'example.com';
-  const url = new URL(`https://${host}/.netlify/functions/verify_check`);
-  url.searchParams.set('id', email);
-  url.searchParams.set('token', token);
-  // Sprache kann optional vom Frontend mitgegeben werden (lang=de|it|en)
-  if (data.lang) url.searchParams.set('lang', String(data.lang).toLowerCase());
-  const link = url.toString();
 
   try {
-    // 0) Kontakt anlegen, falls nicht vorhanden
-    const getResp = await fetch(`https://api.mailjet.com/v3/REST/contact/${encodeURIComponent(email)}`, {
+    // 1) Pull contact properties by email
+    const resp = await fetch(`https://api.mailjet.com/v3/REST/contactdata/${encodeURIComponent(email)}`, {
       headers: { Authorization: mjAuth }
     });
-    if (getResp.status === 404) {
-      const createResp = await fetch('https://api.mailjet.com/v3/REST/contact', {
-        method: 'POST',
-        headers: { Authorization: mjAuth, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ Email: email })
-      });
-      if (!createResp.ok) {
-        const t = await createResp.text();
-        return { statusCode: 500, body: `Kontaktanlage fehlgeschlagen: ${t}` };
-      }
+    if (!resp.ok) {
+      const t = await resp.text();
+      return { statusCode: 502, body: `Mailjet fetch failed: ${t}` };
+    }
+    const json = await resp.json();
+    const propsArray = json.Data?.[0]?.Data || [];
+    const props = Object.fromEntries(propsArray.map(p => [p.Name, p.Value]));
+
+    // 2) Validate glaeubiger + token (+expiry)
+    const glaeubiger = (props['gläubiger'] ?? props['glaeubiger'] ?? '').toString().trim();
+    const tokenVerify = (props['token_verify'] || '').toString().trim();
+    const tokenExpiry = props['token_expiry'] ? new Date(props['token_expiry']) : null;
+
+    if (glaeubiger !== id) {
+      return { statusCode: 403, body: 'ID mismatch' };
+    }
+    if (!tokenVerify || tokenVerify !== token) {
+      return { statusCode: 403, body: 'Invalid token' };
+    }
+    if (tokenExpiry && isFinite(tokenExpiry) && tokenExpiry < new Date() && ENFORCE_EXPIRY) {
+      return { statusCode: 410, body: 'Token expired' };
     }
 
-    // 1) Kontakt-Properties aktualisieren (überschreiben)
-    const updateBody = {
-      Data: [
-        { Name: 'glaeubiger', Value: glaeubiger },
-        { Name: 'firstname', Value: firstname },
-        { Name: 'name', Value: name },
-        { Name: 'strasse', Value: strasse },
-        { Name: 'hausnummer', Value: hausnummer },
-        { Name: 'plz', Value: plz },
-        { Name: 'ort', Value: ort },
-        { Name: 'country', Value: country },
-        { Name: 'ip_verify', Value: ip },
-        { Name: 'timestamp_verify', Value: timestamp },
-        { Name: 'token_verify', Value: token },
-        { Name: 'token_expiry', Value: expiryDate },
-        { Name: 'link_verify', Value: link }
-      ]
-    };
+    // 3) Build update set from submitted address fields
+    const fields = ['firstname','name','strasse','hausnummer','plz','ort','country'];
+    const updates = [];
+    for (const f of fields) {
+      const v = (body[f] || '').toString();
+      if (v) updates.push({ Name: f, Value: v });
+    }
 
-    const updateResp = await fetch(`https://api.mailjet.com/v3/REST/contactdata/${encodeURIComponent(email)}`, {
+    // Always store audit fields
+    updates.push({ Name: 'ip_verify', Value: ip });
+    updates.push({ Name: 'timestamp_verify', Value: timestamp });
+
+    // Optional: clear token & link after successful submit (keep during test if needed)
+    // updates.push({ Name: 'token_verify', Value: '' });
+    // updates.push({ Name: 'link_verify', Value: '' });
+
+    if (updates.length === 0) {
+      return { statusCode: 400, body: 'No data to update' };
+    }
+
+    const put = await fetch(`https://api.mailjet.com/v3/REST/contactdata/${encodeURIComponent(email)}`, {
       method: 'PUT',
       headers: { Authorization: mjAuth, 'Content-Type': 'application/json' },
-      body: JSON.stringify(updateBody)
+      body: JSON.stringify({ Data: updates })
     });
-    if (!updateResp.ok) {
-      const t = await updateResp.text();
-      return { statusCode: 500, body: `Mailjet update failed: ${t}` };
+    if (!put.ok) {
+      const t = await put.text();
+      return { statusCode: 502, body: `Mailjet update failed: ${t}` };
     }
 
-    // 2) Bestätigungsmail senden
-    const respMail = await fetch('https://api.mailjet.com/v3.1/send', {
+    // Optional: send confirmation email to contact
+    // (comment out if not desired)
+    /*
+    const confirm = await fetch('https://api.mailjet.com/v3.1/send', {
       method: 'POST',
-      headers: { 'Authorization': mjAuth, 'Content-Type': 'application/json' },
+      headers: { Authorization: mjAuth, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         Messages: [{
-          From: { Email: "noreply@sikuralife.com", Name: "Sikura Life Verifizierung" },
-          ReplyTo: { Email: "support@sikuralife.com", Name: "Sikura Support" },
+          From: { Email: "noreply@sikuralife.com", Name: "Sikura Life" },
           To: [{ Email: email }],
-          Subject: "Bitte bestätige deine Adresse / Per favore conferma il tuo indirizzo / Please confirm your address",
-          HTMLPart: `
-            <p>DE: Bitte bestätige deine E‑Mail-Adresse und Postadresse über folgenden Link:</p>
-            <p><a href="${link}">${link}</a></p>
-            <p>Hinweis: Der Link ist aus Sicherheitsgründen ${TOKEN_EXPIRY_DAYS} Tage gültig.${TEST_MODE ? " (Testmodus: keine Sperrung nach Ablauf)" : ""}</p>
-            <hr/>
-            <p>IT: Conferma il tuo indirizzo e-mail e postale tramite il seguente link:</p>
-            <p><a href="${link}">${link}</a></p>
-            <p>Nota: Il link è valido per motivi di sicurezza per ${TOKEN_EXPIRY_DAYS} giorni.${TEST_MODE ? " (Modalità test: nessun blocco dopo la scadenza)" : ""}</p>
-            <hr/>
-            <p>EN: Please confirm your e‑mail and postal address via the following link:</p>
-            <p><a href="${link}">${link}</a></p>
-            <p>Note: For security, the link is valid for ${TOKEN_EXPIRY_DAYS} days.${TEST_MODE ? " (Test mode: no blocking after expiry)" : ""}</p>
-          `
+          Subject: "Bestätigung erhalten",
+          HTMLPart: "<p>Danke, Ihre Adressdaten wurden aktualisiert.</p>"
         }]
       })
     });
-    const mailText = await respMail.text();
-    if (!respMail.ok) {
-      return { statusCode: 500, body: `Mail send failed: ${mailText}` };
+    if (!confirm.ok) {
+      // Do not fail the whole flow on mail send issues
+      console.warn('Mail send failed:', await confirm.text());
     }
+    */
 
-    return { statusCode: 200, body: JSON.stringify({ message: 'OK', testMode: TEST_MODE }) };
+    return {
+      statusCode: 200,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ok: true, testMode: TEST_MODE, email, id })
+    };
   } catch (err) {
     return { statusCode: 500, body: `Server error: ${err.message}` };
   }
