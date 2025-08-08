@@ -311,42 +311,35 @@
       if (errEl) { errEl.textContent = ""; errEl.style.display = 'none'; }
     }
 
-    // Harden PLZ: block non-digits at the source (typing, paste, drop), plus sanitize
+    // Harden PLZ input (typing, paste, drop)
     document.addEventListener('DOMContentLoaded', () => {
       const plzEl = document.getElementById('plz');
 
-      // Block non-digits before they get in
       plzEl.addEventListener('beforeinput', (e) => {
-        if (e.inputType === 'insertFromPaste' || e.inputType === 'insertFromDrop') return; // handled separately
-        if (typeof e.data === 'string' && /\D/.test(e.data)) {
-          e.preventDefault();
-        }
+        if (e.inputType === 'insertFromPaste' || e.inputType === 'insertFromDrop') return;
+        if (typeof e.data === 'string' && /\D/.test(e.data)) e.preventDefault();
       });
 
-      // Sanitize on input (covers paste in many browsers)
       plzEl.addEventListener('input', (e) => {
         const cleaned = e.target.value.replace(/\D+/g, '');
         if (e.target.value !== cleaned) e.target.value = cleaned;
       });
 
-      // Clean pasted content
       plzEl.addEventListener('paste', (e) => {
         e.preventDefault();
         const text = (e.clipboardData || window.clipboardData).getData('text');
-        const onlyDigits = String(text).replace(/\D+/g, '');
-        document.execCommand('insertText', false, onlyDigits);
+        const digits = String(text).replace(/\D+/g, '');
+        if (digits) document.execCommand('insertText', false, digits);
       });
 
-      // Prevent dropping non-text or any non-digit text
       plzEl.addEventListener('drop', (e) => {
         e.preventDefault();
         const text = (e.dataTransfer && e.dataTransfer.getData('text')) || '';
-        const onlyDigits = String(text).replace(/\D+/g, '');
-        if (onlyDigits) plzEl.value = plzEl.value + onlyDigits;
+        const digits = String(text).replace(/\D+/g, '');
+        if (digits) plzEl.value = plzEl.value + digits;
         plzEl.dispatchEvent(new Event('input', { bubbles: true }));
       });
 
-      // Also sanitize on blur
       plzEl.addEventListener('blur', () => {
         const cleaned = plzEl.value.replace(/\D+/g, '');
         if (plzEl.value !== cleaned) plzEl.value = cleaned;
@@ -361,6 +354,24 @@
       if (["it","ita","italien","italia","italy"].includes(s)) return "IT";
       if (["de","deu","deutschland","germany","alemania"].includes(s)) return "DE";
       return "";
+    }
+
+    async function verifyFirst(email, id, token) {
+      try {
+        const resp = await fetch('/.netlify/functions/verify_check', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, id, token })
+        });
+        if (!resp.ok) {
+          // 409/410 etc = already used/expired
+          return { ok: false, status: resp.status };
+        }
+        const data = await resp.json().catch(() => ({}));
+        return { ok: true, data };
+      } catch (e) {
+        return { ok: false, status: 0 };
+      }
     }
 
     (async function init() {
@@ -384,6 +395,17 @@
       }
 
       const email = b64urlDecode(em).trim() || (qs('email') || "");
+
+      // Verify FIRST (one-time use)
+      const res = await verifyFirst(email, id, token);
+      if (!res.ok) {
+        const el = document.getElementById('gate-error');
+        el.textContent = i18n[currentLang].gateFail;
+        el.classList.remove('hidden');
+        return;
+      }
+
+      // If verify_check passed, continue and prefill
       safeSet('email', email); safeSet('id', id); safeSet('token', token); safeSet('em', em);
 
       try {
@@ -394,13 +416,6 @@
         const glaeubiger = (data.glaeubiger ?? data['gläubiger'] ?? "").toString().trim();
         safeSet('glaeubiger', glaeubiger);
         ['firstname','name','strasse','hausnummer','plz','ort','country'].forEach(k => safeSet(k, data[k]));
-
-        if (glaeubiger !== id) {
-          const el = document.getElementById('gate-error');
-          el.textContent = i18n[currentLang].gateFail + " (ID mismatch)";
-          el.classList.remove('hidden');
-          return;
-        }
 
         const ok = document.getElementById('gate-ok');
         ok.textContent = i18n[currentLang].gateOk;
@@ -454,7 +469,6 @@
       if (!v) { showError(id, 'errRequired'); return false; }
 
       if (id === 'plz') {
-        // sanitize again just in case
         v = v.replace(/\D+/g, '');
         if (el.value !== v) el.value = v;
         if (!/^\d+$/.test(v)) { showError('plz','errDigits'); return false; }
