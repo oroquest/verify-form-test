@@ -4,7 +4,7 @@ const mjAuth = 'Basic ' + Buffer.from(`${MJ_PUBLIC}:${MJ_PRIVATE}`).toString('ba
 
 /**
  * GET /.netlify/functions/get_contact?id=<email>
- * Antwort: { glaeubiger, firstname, name, strasse, hausnummer, plz, ort, country, email }
+ * Antwort: { glaeubiger, firstname, name, strasse, hausnummer, plz, ort, country, email, token_verify, token_expiry }
  */
 exports.handler = async (event) => {
   if (event.httpMethod !== 'GET') {
@@ -24,7 +24,6 @@ exports.handler = async (event) => {
     if (resp.status === 404) {
       return { statusCode: 404, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ error: 'Contact not found' }) };
     }
-
     if (!resp.ok) {
       const t = await resp.text();
       return { statusCode: 502, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ error: 'Mailjet error', details: t }) };
@@ -34,24 +33,24 @@ exports.handler = async (event) => {
     const arr = body.Data || [];
     const list = arr[0]?.Data || [];
 
-    // Map Name->Value
+    // Map Name->Value (robust gegen Umlaute/Varianten)
     const obj = {};
-    for (const item of list) {
-      obj[item.Name] = item.Value;
-    }
+    for (const item of list) obj[item.Name] = item.Value;
 
-    // Support both "glaeubiger" and "glaeubiger_nr"
-    const glaeubiger = obj.glaeubiger ?? obj.glaeubiger_nr ?? '';
+    const glaeubiger =
+      obj['gläubiger'] ?? obj['glaeubiger'] ?? obj['glaeubiger_nr'] ?? '';
 
     const out = {
-      glaeubiger,
-      firstname: obj.firstname ?? '',
-      name: obj.name ?? '',
-      strasse: obj.strasse ?? '',
-      hausnummer: obj.hausnummer ?? '',
-      plz: obj.plz ?? '',
-      ort: obj.ort ?? '',
-      country: obj.country ?? '',
+      glaeubiger: glaeubiger,
+      firstname: obj['firstname'] ?? '',
+      name:      obj['name'] ?? '',
+      strasse:   obj['strasse'] ?? '',
+      hausnummer:obj['hausnummer'] ?? '',
+      plz:       obj['plz'] ?? '',
+      ort:       obj['ort'] ?? '',
+      country:   obj['country'] ?? '',
+      token_verify: obj['token_verify'] ?? '',
+      token_expiry: obj['token_expiry'] ?? '',
       email
     };
 
