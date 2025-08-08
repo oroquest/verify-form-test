@@ -3,85 +3,310 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Sikura Verifizierung</title>
-  <link rel="stylesheet" href="style.css">
-  <script src="script.js" defer></script>
+  <title>Sikura – Adressbestätigung</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; background:#f5f6f8; margin:0; }
+    .container { max-width:760px; margin:32px auto; background:#fff; padding:24px; border-radius:14px; box-shadow:0 8px 24px rgba(0,0,0,.06); }
+    .row { display:flex; gap:16px; }
+    .row > div { flex:1; }
+    label { display:block; margin:12px 0 6px; font-weight:600; }
+    input[type="text"], input[type="email"], textarea, select {
+      width:100%; padding:12px; border:1px solid #d1d5db; border-radius:10px; font-size:16px; background:#fff;
+    }
+    input[readonly] { background:#f3f4f6; color:#6b7280; }
+    .language-switcher { display:flex; justify-content:flex-end; margin-bottom:8px; }
+    .checkbox-group { margin-top:12px; }
+    .checkbox-line { display:flex; gap:8px; align-items:flex-start; }
+    .hint { font-size:14px; color:#6b7280; margin-top:6px; }
+    .error { color:#b91c1c; margin:10px 0; display:none; }
+    .ok { color:#065f46; margin:10px 0; display:none; }
+    button { margin-top:18px; padding:12px 18px; border:0; background:#0f172a; color:#fff; border-radius:10px; font-size:16px; cursor:pointer; }
+    button:disabled { opacity:.6; cursor:not-allowed; }
+    .logo { height:48px; margin-bottom:12px; }
+    .hidden { display:none; }
+  </style>
 </head>
 <body>
   <div class="container">
-    <img src="siku_logo.png" alt="Sikura Life Logo" class="logo"/>
-    <h2 data-i18n="title">Bitte bestätigen Sie Ihre Daten</h2>
+    <div class="language-switcher">
+      <select id="language">
+        <option value="de">Deutsch</option>
+        <option value="it">Italiano</option>
+        <option value="en">English</option>
+      </select>
+    </div>
 
-    <form id="verify-form">
-      <div class="language-switcher">
-        <select id="language" onchange="setLanguage(this.value)">
-          <option value="de">Deutsch</option>
-          <option value="it">Italiano</option>
-          <option value="en">English</option>
-        </select>
-      </div>
+    <img src="siku_logo.png" alt="Sikura Life" class="logo" />
+    <h2 id="title">Bitte bestätigen Sie Ihre Adresse</h2>
+    <p id="intro" class="hint">Felder sind vorbefüllt und können bei Bedarf aktualisiert werden.</p>
 
-      <label for="glaeubiger" data-i18n="glaeubiger">Gläubiger-Nr.</label>
+    <div id="gate-error" class="error hidden"></div>
+    <div id="gate-ok" class="ok hidden"></div>
+
+    <form id="verify-form" class="hidden" method="POST" action="/.netlify/functions/verify_submit">
+      <!-- Hidden: email/lang (id & token bleiben in URL) -->
+      <input type="hidden" id="email" name="email" />
+      <input type="hidden" id="lang" name="lang" />
+
+      <label for="glaeubiger" id="lbl-glaeubiger">Gläubiger‑Nr.</label>
       <input type="text" id="glaeubiger" name="glaeubiger" readonly required />
 
-      <label for="vorname" data-i18n="firstname">Vorname</label>
-      <input type="text" id="vorname" name="vorname" required />
+      <label for="firstname" id="lbl-firstname">Vorname</label>
+      <input type="text" id="firstname" name="firstname" required />
 
-      <label for="name" data-i18n="name">Name</label>
+      <label for="name" id="lbl-name">Name</label>
       <input type="text" id="name" name="name" required />
 
-      <label for="strasse" data-i18n="strasse">Strasse</label>
-      <input type="text" id="strasse" name="strasse" required />
+      <div class="row">
+        <div>
+          <label for="strasse" id="lbl-strasse">Strasse</label>
+          <input type="text" id="strasse" name="strasse" required />
+        </div>
+        <div style="max-width:180px;">
+          <label for="hausnummer" id="lbl-hausnummer">Nr.</label>
+          <input type="text" id="hausnummer" name="hausnummer" required />
+        </div>
+      </div>
 
-      <label for="hausnummer" data-i18n="hausnummer">Hausnummer</label>
-      <input type="text" id="hausnummer" name="hausnummer" required />
+      <div class="row">
+        <div style="max-width:200px;">
+          <label for="plz" id="lbl-plz">PLZ</label>
+          <input type="text" id="plz" name="plz" required />
+        </div>
+        <div>
+          <label for="ort" id="lbl-ort">Ort</label>
+          <input type="text" id="ort" name="ort" required />
+        </div>
+      </div>
 
-      <label for="plz" data-i18n="plz">PLZ</label>
-      <input type="text" id="plz" name="plz" required />
+      <label for="country" id="lbl-country">Land</label>
+      <input type="text" id="country" name="country" required />
 
-      <label for="ort" data-i18n="ort">Ort</label>
-      <input type="text" id="ort" name="ort" required />
+      <div class="checkbox-group">
+        <label class="checkbox-line">
+          <input type="checkbox" id="confirm" name="confirm" required />
+          <span id="txt-confirm">Ich bestätige, dass die angegebenen Daten korrekt sind.</span>
+        </label>
+      </div>
+      <div class="checkbox-group">
+        <label class="checkbox-line">
+          <input type="checkbox" id="privacy" name="privacy" required />
+          <span id="txt-privacy">Ich stimme der Verarbeitung meiner Daten gemäss DSGVO zu.</span>
+        </label>
+      </div>
 
-      <label for="land" data-i18n="land">Land</label>
-      <input type="text" id="land" name="land" required />
+      <div id="error" class="error"></div>
 
-      <button type="submit" data-i18n="submit">Absenden</button>
+      <button type="submit" id="btn-submit">Absenden</button>
+      <div class="hint" id="hint-expiry">Hinweis: Der Bestätigungslink ist aus Sicherheitsgründen 7 Tage gültig.</div>
     </form>
   </div>
+
+  <script>
+    // --------- I18N ---------
+    const i18n = {
+      de: {
+        title: "Bitte bestätigen Sie Ihre Adresse",
+        intro: "Felder sind vorbefüllt und können bei Bedarf aktualisiert werden.",
+        glaeubiger: "Gläubiger‑Nr.",
+        firstname: "Vorname",
+        name: "Name",
+        strasse: "Strasse",
+        hausnummer: "Nr.",
+        plz: "PLZ",
+        ort: "Ort",
+        country: "Land",
+        confirm: "Ich bestätige, dass die angegebenen Daten korrekt sind.",
+        privacy: "Ich stimme der Verarbeitung meiner Daten gemäss DSGVO zu.",
+        submit: "Absenden",
+        required: "Bitte füllen Sie alle Pflichtfelder aus.",
+        expiry: "Hinweis: Der Bestätigungslink ist aus Sicherheitsgründen 7 Tage gültig.",
+        gateFail: "Verifizierung fehlgeschlagen. Der Link ist ungültig oder abgelaufen.",
+        gateWarn: "⚠ Hinweis: Testmodus – Der Link wäre abgelaufen, das Formular ist dennoch verfügbar.",
+        gateOk: "Link geprüft – Formular freigeschaltet."
+      },
+      it: {
+        title: "Per favore conferma il tuo indirizzo",
+        intro: "I campi sono precompilati e possono essere aggiornati se necessario.",
+        glaeubiger: "Numero del creditore",
+        firstname: "Nome",
+        name: "Cognome",
+        strasse: "Via",
+        hausnummer: "Nr.",
+        plz: "CAP",
+        ort: "Città",
+        country: "Paese",
+        confirm: "Confermo che i dati forniti sono corretti.",
+        privacy: "Acconsento al trattamento dei miei dati secondo il GDPR.",
+        submit: "Invia",
+        required: "Per favore compila tutti i campi obbligatori.",
+        expiry: "Nota: Per motivi di sicurezza il link è valido per 7 giorni.",
+        gateFail: "Verifica non riuscita. Il link non è valido o è scaduto.",
+        gateWarn: "⚠ Avviso: Modalità test – Il link sarebbe scaduto, il modulo è comunque disponibile.",
+        gateOk: "Link verificato – modulo abilitato."
+      },
+      en: {
+        title: "Please confirm your address",
+        intro: "Fields are pre-filled and can be updated if needed.",
+        glaeubiger: "Creditor No.",
+        firstname: "First name",
+        name: "Last name",
+        strasse: "Street",
+        hausnummer: "No.",
+        plz: "ZIP",
+        ort: "City",
+        country: "Country",
+        confirm: "I confirm that the information provided is correct.",
+        privacy: "I consent to the processing of my data under GDPR.",
+        submit: "Submit",
+        required: "Please fill in all required fields.",
+        expiry: "Note: For security, the confirmation link is valid for 7 days.",
+        gateFail: "Verification failed. The link is invalid or expired.",
+        gateWarn: "⚠ Notice: Test mode – The link would be expired, the form is still available.",
+        gateOk: "Link verified – form enabled."
+      }
+    };
+
+    function setLanguage(lang) {
+      const d = i18n[lang] || i18n.de;
+      document.documentElement.lang = lang;
+      document.getElementById('title').textContent = d.title;
+      document.getElementById('intro').textContent = d.intro;
+      document.getElementById('lbl-glaeubiger').textContent = d.glaeubiger;
+      document.getElementById('lbl-firstname').textContent = d.firstname;
+      document.getElementById('lbl-name').textContent = d.name;
+      document.getElementById('lbl-strasse').textContent = d.strasse;
+      document.getElementById('lbl-hausnummer').textContent = d.hausnummer;
+      document.getElementById('lbl-plz').textContent = d.plz;
+      document.getElementById('lbl-ort').textContent = d.ort;
+      document.getElementById('lbl-country').textContent = d.country;
+      document.getElementById('txt-confirm').textContent = d.confirm;
+      document.getElementById('txt-privacy').textContent = d.privacy;
+      document.getElementById('btn-submit').textContent = d.submit;
+      document.getElementById('hint-expiry').textContent = d.expiry;
+    }
+
+    function qs(name) {
+      const p = new URLSearchParams(location.search);
+      return p.get(name) || "";
+    }
+
+    // Base64URL decode (without padding)
+    function b64urlDecode(str) {
+      try {
+        let s = str.replace(/-/g,'+').replace(/_/g,'/');
+        // add padding if removed
+        while (s.length % 4 !== 0) s += '=';
+        return decodeURIComponent(escape(atob(s)));
+      } catch (e) {
+        // Fallback ohne escape (neuere Browser)
+        try {
+          let s = str.replace(/-/g,'+').replace(/_/g,'/');
+          while (s.length % 4 !== 0) s += '=';
+          return atob(s);
+        } catch (err) {
+          return "";
+        }
+      }
+    }
+
+    function safeSet(id, value) {
+      if (value !== undefined && value !== null && String(value).trim() !== "") {
+        document.getElementById(id).value = value;
+      }
+    }
+
+    (async function init() {
+      // Sprache
+      const lang = (qs('lang') || '').toLowerCase();
+      const currentLang = ['de','it','en'].includes(lang) ? lang : 'de';
+      document.getElementById('language').value = currentLang;
+      document.getElementById('lang').value = currentLang;
+      setLanguage(currentLang);
+      document.getElementById('language').addEventListener('change', (e)=>{
+        const l = e.target.value;
+        document.getElementById('lang').value = l;
+        setLanguage(l);
+      });
+
+      // URL-Params
+      const id = qs('id');
+      const token = qs('token');
+      const em = qs('em');
+
+      // Guard: Muss vorhanden sein
+      if (!id || !token || !em) {
+        const msg = i18n[currentLang].gateFail;
+        const el = document.getElementById('gate-error'); el.textContent = msg; el.classList.remove('hidden');
+        return;
+      }
+
+      // Email decodieren
+      const email = b64urlDecode(em).trim();
+      if (!email || !/@/.test(email)) {
+        const msg = i18n[currentLang].gateFail + " (E-Mail ungültig)";
+        const el = document.getElementById('gate-error'); el.textContent = msg; el.classList.remove('hidden');
+        return;
+      }
+      document.getElementById('email').value = email;
+
+      // Daten von Server holen und Token/ID prüfen
+      try {
+        const resp = await fetch('/.netlify/functions/get_contact?id=' + encodeURIComponent(email));
+        if (!resp.ok) throw new Error('lookup failed');
+        const data = await resp.json();
+
+        // Prüfen: id (gläubiger) & token aus Mailjet
+        const glaeubiger = (data.glaeubiger ?? data['gläubiger'] ?? "").toString().trim();
+        // hole zusätzliche Felder über zweiten Call verify_check? Wir prüfen minimal token clientseitig nicht, das erledigt Server beim Absenden/Check.
+
+        safeSet('glaeubiger', glaeubiger);
+        safeSet('firstname', data.firstname);
+        safeSet('name', data.name);
+        safeSet('strasse', data.strasse);
+        safeSet('hausnummer', data.hausnummer);
+        safeSet('plz', data.plz);
+        safeSet('ort', data.ort);
+        safeSet('country', data.country);
+
+        if (glaeubiger !== id) {
+          const el = document.getElementById('gate-error');
+          el.textContent = i18n[currentLang].gateFail + " (ID mismatch)";
+          el.classList.remove('hidden');
+          return;
+        }
+
+        // Alles ok → Formular freigeben
+        const ok = document.getElementById('gate-ok');
+        ok.textContent = i18n[currentLang].gateOk;
+        ok.classList.remove('hidden');
+        document.getElementById('verify-form').classList.remove('hidden');
+      } catch (e) {
+        const el = document.getElementById('gate-error');
+        el.textContent = i18n[currentLang].gateFail;
+        el.classList.remove('hidden');
+      }
+
+      // Client-Validation
+      document.getElementById('verify-form').addEventListener('submit', (e) => {
+        const dict = i18n[document.getElementById('lang').value] || i18n.de;
+        const requiredIds = ['firstname','name','strasse','hausnummer','plz','ort','country'];
+        let ok = true;
+        for (const id of requiredIds) {
+          const val = (document.getElementById(id).value || '').trim();
+          if (!val) { ok = false; break; }
+        }
+        if (!ok || !document.getElementById('confirm').checked || !document.getElementById('privacy').checked) {
+          e.preventDefault();
+          const el = document.getElementById('error');
+          el.textContent = dict.required;
+          el.style.display = 'block';
+          return false;
+        }
+        document.getElementById('error').style.display = 'none';
+        return true;
+      });
+    })();
+  </script>
 </body>
-<script>
-document.getElementById('verify-form').addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const params = new URLSearchParams(window.location.search);
-  const id = params.get('id');
-  const token = params.get('token');
-  const email = atob(params.get('em'));
-
-  const payload = {
-    id,
-    token,
-    email,
-    vorname: document.getElementById('vorname').value,
-    name: document.getElementById('name').value,
-    strasse: document.getElementById('strasse').value,
-    hausnummer: document.getElementById('hausnummer').value,
-    plz: document.getElementById('plz').value,
-    ort: document.getElementById('ort').value,
-    land: document.getElementById('land').value
-  };
-
-  const resp = await fetch('/.netlify/functions/verify_submit', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload)
-  });
-
-  const data = await resp.json();
-  if (data.ok) {
-    window.location.href = "https://verify.sikuralife.com/danke.html";
-  } else {
-    alert("Fehler: " + (data.error || 'Unbekannt'));
-  }
-});
-</script>
 </html>
