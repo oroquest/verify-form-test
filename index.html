@@ -47,6 +47,10 @@
       <!-- Hidden: email/lang (id & token bleiben in URL) -->
       <input type="hidden" id="email" name="email" />
       <input type="hidden" id="lang" name="lang" />
+	  <input type="hidden" id="id"    name="id"    />
+<input type="hidden" id="token" name="token" />
+<input type="hidden" id="em"    name="em"    />
+	  
 
       <label for="glaeubiger" id="lbl-glaeubiger">Gläubiger‑Nr.</label>
       <input type="text" id="glaeubiger" name="glaeubiger" readonly required />
@@ -215,7 +219,7 @@
         document.getElementById(id).value = value;
       }
     }
-
+	
     (async function init() {
       // Sprache
       const lang = (qs('lang') || '').toLowerCase();
@@ -241,14 +245,23 @@
         return;
       }
 
-      // Email decodieren
-      const email = b64urlDecode(em).trim();
-      if (!email || !/@/.test(email)) {
-        const msg = i18n[currentLang].gateFail + " (E-Mail ungültig)";
-        const el = document.getElementById('gate-error'); el.textContent = msg; el.classList.remove('hidden');
-        return;
-      }
-      document.getElementById('email').value = email;
+      // Email aus em (Base64URL) decodieren
+let email = "";
+if (em) {
+  email = b64urlDecode(em).trim();
+} else {
+  // Fallback (nur falls em fehlt)
+  email = qs('email') || "";
+}
+
+// Hidden-Felder für den Submit setzen
+safeSet('email', email);
+safeSet('id',    id);
+safeSet('token', token);
+safeSet('em',    em);
+
+	  
+	  
 
       // Daten von Server holen und Token/ID prüfen
       try {
