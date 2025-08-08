@@ -1,84 +1,256 @@
-
 <!DOCTYPE html>
 <html lang="de">
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Sikura Verifizierung</title>
-  <link rel="stylesheet" href="style.css">
-  <script src="script.js" defer></script>
+  <title>Sikura – Adressbestätigung</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; background:#f7f7f8; margin:0; }
+    .container { max-width:720px; margin:32px auto; background:#fff; padding:24px; border-radius:14px; box-shadow:0 4px 16px rgba(0,0,0,.06); }
+    .row { display:flex; gap:16px; }
+    .row > div { flex:1; }
+    label { display:block; margin:14px 0 6px; font-weight:600; }
+    input[type="text"], input[type="email"], textarea, select {
+      width:100%; padding:12px; border:1px solid #d1d5db; border-radius:10px; font-size:16px; background:#fff;
+    }
+    input[readonly] { background:#f3f4f6; color:#6b7280; }
+    .language-switcher { display:flex; justify-content:flex-end; margin-bottom:8px; }
+    .checkbox-group { margin-top:12px; }
+    .checkbox-line { display:flex; gap:8px; align-items:flex-start; }
+    .hint { font-size:14px; color:#6b7280; margin-top:6px; }
+    .error { color:#b91c1c; margin:10px 0; display:none; }
+    button { margin-top:18px; padding:12px 18px; border:0; background:#111827; color:#fff; border-radius:10px; font-size:16px; cursor:pointer; }
+    button:disabled { opacity:.6; cursor:not-allowed; }
+    .logo { height:48px; margin-bottom:12px; }
+  </style>
 </head>
 <body>
   <div class="container">
-    <img src="siku_logo.png" alt="Sikura Life Logo" class="logo"/>
-    <h2 data-i18n="title">Bitte bestätigen Sie Ihre Daten</h2>
+    <div class="language-switcher">
+      <select id="language">
+        <option value="de">Deutsch</option>
+        <option value="it">Italiano</option>
+        <option value="en">English</option>
+      </select>
+    </div>
 
-	<form name="verify-form" method="POST" action="/.netlify/functions/verify_submit" id="verify-form">
+    <img src="siku_logo.png" alt="Sikura Life" class="logo" />
+    <h2 id="title">Bitte bestätigen Sie Ihre Adresse</h2>
+    <p id="intro" class="hint">Felder sind vorbefüllt und können bei Bedarf aktualisiert werden.</p>
 
-      <div class="language-switcher">
-        <select id="language" onchange="setLanguage(this.value)">
-          <option value="de">Deutsch</option>
-          <option value="it">Italiano</option>
-          <option value="en">English</option>
-        </select>
-      </div>
+    <form id="verify-form" method="POST" action="/.netlify/functions/verify_submit">
+      <!-- Hidden: email/id/lang (id=email laut aktuellem Flow) -->
+      <input type="hidden" id="email" name="email" />
+      <input type="hidden" id="lang" name="lang" />
 
-      <label for="glaeubiger" data-i18n="glaeubiger">Gläubiger-Nr.</label>
+      <label for="glaeubiger" id="lbl-glaeubiger">Gläubiger‑Nr.</label>
       <input type="text" id="glaeubiger" name="glaeubiger" readonly required />
 
-	  <label for="token" data-i18n="token">Token</label>
+      <label for="firstname" id="lbl-firstname">Vorname</label>
+      <input type="text" id="firstname" name="firstname" required />
 
-      <input type="text" id="token" name="token" readonly required />
+      <label for="name" id="lbl-name">Name</label>
+      <input type="text" id="name" name="name" required />
 
-      <label for="name" data-i18n="name">Name</label>
-      <input type="text" id="name" name="name" readonly />
-
-      <label for="email" data-i18n="email">E-Mail-Adresse</label>
-	  <input type="email" id="email" name="email" required />
-
-
-      <label for="adresse" data-i18n="adresse">Aktuelle Adresse</label>
-      <textarea id="adresse" name="adresse" rows="3" required></textarea>
-
-      <div class="checkbox-group">
-        <label class="checkbox-line"><input type="checkbox" id="confirm" name="confirm" /><span data-i18n="confirm1">Ich bestätige, dass die angegebenen Daten korrekt sind.</span></label>
+      <div class="row">
+        <div>
+          <label for="strasse" id="lbl-strasse">Strasse</label>
+          <input type="text" id="strasse" name="strasse" required />
+        </div>
+        <div style="max-width:180px;">
+          <label for="hausnummer" id="lbl-hausnummer">Nr.</label>
+          <input type="text" id="hausnummer" name="hausnummer" required />
+        </div>
       </div>
 
-      <div class="checkbox-group">
-        <label class="checkbox-line"><input type="checkbox" id="privacy" name="privacy" /><span data-i18n="confirm2">Ich stimme der Verarbeitung meiner Daten im Rahmen des Konkursverfahrens der SIKURA Leben AG. i.L. gemäss DSGVO zu.</span></label>
+      <div class="row">
+        <div style="max-width:200px;">
+          <label for="plz" id="lbl-plz">PLZ</label>
+          <input type="text" id="plz" name="plz" required />
+        </div>
+        <div>
+          <label for="ort" id="lbl-ort">Ort</label>
+          <input type="text" id="ort" name="ort" required />
+        </div>
       </div>
 
-      <button type="submit" data-i18n="submit">Absenden</button>
+      <label for="country" id="lbl-country">Land</label>
+      <input type="text" id="country" name="country" required />
+
+      <div class="checkbox-group">
+        <label class="checkbox-line">
+          <input type="checkbox" id="confirm" name="confirm" required />
+          <span id="txt-confirm">Ich bestätige, dass die angegebenen Daten korrekt sind.</span>
+        </label>
+      </div>
+      <div class="checkbox-group">
+        <label class="checkbox-line">
+          <input type="checkbox" id="privacy" name="privacy" required />
+          <span id="txt-privacy">Ich stimme der Verarbeitung meiner Daten gemäss DSGVO zu.</span>
+        </label>
+      </div>
+
+      <div id="error" class="error"></div>
+
+      <button type="submit" id="btn-submit">Absenden</button>
+      <div class="hint" id="hint-expiry">Hinweis: Der Bestätigungslink ist aus Sicherheitsgründen 7 Tage gültig.</div>
     </form>
   </div>
 
-<script>
-  document.getElementById("verify-form").addEventListener("submit", async function (e) {
-    e.preventDefault();
-    const form = e.target;
-    const data = new FormData(form);
-    const json = Object.fromEntries(data.entries());
+  <script>
+    // --- I18N ---
+    const i18n = {
+      de: {
+        title: "Bitte bestätigen Sie Ihre Adresse",
+        intro: "Felder sind vorbefüllt und können bei Bedarf aktualisiert werden.",
+        glaeubiger: "Gläubiger‑Nr.",
+        firstname: "Vorname",
+        name: "Name",
+        strasse: "Strasse",
+        hausnummer: "Nr.",
+        plz: "PLZ",
+        ort: "Ort",
+        country: "Land",
+        confirm: "Ich bestätige, dass die angegebenen Daten korrekt sind.",
+        privacy: "Ich stimme der Verarbeitung meiner Daten gemäss DSGVO zu.",
+        submit: "Absenden",
+        required: "Bitte füllen Sie alle Pflichtfelder aus.",
+        expiry: "Hinweis: Der Bestätigungslink ist aus Sicherheitsgründen 7 Tage gültig."
+      },
+      it: {
+        title: "Per favore conferma il tuo indirizzo",
+        intro: "I campi sono precompilati e possono essere aggiornati se necessario.",
+        glaeubiger: "Numero del creditore",
+        firstname: "Nome",
+        name: "Cognome",
+        strasse: "Via",
+        hausnummer: "Nr.",
+        plz: "CAP",
+        ort: "Città",
+        country: "Paese",
+        confirm: "Confermo che i dati forniti sono corretti.",
+        privacy: "Acconsento al trattamento dei miei dati secondo il GDPR.",
+        submit: "Invia",
+        required: "Per favore compila tutti i campi obbligatori.",
+        expiry: "Nota: Per motivi di sicurezza il link è valido per 7 giorni."
+      },
+      en: {
+        title: "Please confirm your address",
+        intro: "Fields are pre-filled and can be updated if needed.",
+        glaeubiger: "Creditor No.",
+        firstname: "First name",
+        name: "Last name",
+        strasse: "Street",
+        hausnummer: "No.",
+        plz: "ZIP",
+        ort: "City",
+        country: "Country",
+        confirm: "I confirm that the information provided is correct.",
+        privacy: "I consent to the processing of my data under GDPR.",
+        submit: "Submit",
+        required: "Please fill in all required fields.",
+        expiry: "Note: For security, the confirmation link is valid for 7 days."
+      }
+    };
 
-    try {
-      const response = await fetch("/.netlify/functions/verify_submit", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(json),
+    function setLanguage(lang) {
+      const dict = i18n[lang] || i18n.de;
+      document.documentElement.lang = lang;
+      document.getElementById('title').textContent = dict.title;
+      document.getElementById('intro').textContent = dict.intro;
+      document.getElementById('lbl-glaeubiger').textContent = dict.glaeubiger;
+      document.getElementById('lbl-firstname').textContent = dict.firstname;
+      document.getElementById('lbl-name').textContent = dict.name;
+      document.getElementById('lbl-strasse').textContent = dict.strasse;
+      document.getElementById('lbl-hausnummer').textContent = dict.hausnummer;
+      document.getElementById('lbl-plz').textContent = dict.plz;
+      document.getElementById('lbl-ort').textContent = dict.ort;
+      document.getElementById('lbl-country').textContent = dict.country;
+      document.getElementById('txt-confirm').textContent = dict.confirm;
+      document.getElementById('txt-privacy').textContent = dict.privacy;
+      document.getElementById('btn-submit').textContent = dict.submit;
+      document.getElementById('hint-expiry').textContent = dict.expiry;
+    }
+
+    function getQS(name) {
+      const params = new URLSearchParams(location.search);
+      return params.get(name) || "";
+    }
+
+    function safeSet(id, value) {
+      if (value !== undefined && value !== null && String(value).trim() !== "") {
+        document.getElementById(id).value = value;
+      }
+    }
+
+    // --- Prefill Logik ---
+    (async function init() {
+      // Sprache
+      const qsLang = (getQS('lang') || '').toLowerCase();
+      const currentLang = ['de','it','en'].includes(qsLang) ? qsLang : 'de';
+      document.getElementById('language').value = currentLang;
+      document.getElementById('lang').value = currentLang;
+      setLanguage(currentLang);
+
+      // ID/E-Mail aus URL
+      const email = getQS('id') || getQS('email') || "";
+      safeSet('email', email);
+
+      // OPTIONAL: Prefill via Netlify Function (falls vorhanden)
+      // Erwartet ein JSON { glaeubiger, firstname, name, strasse, hausnummer, plz, ort, country }
+      try {
+        if (email) {
+          const resp = await fetch('/.netlify/functions/get_contact?id=' + encodeURIComponent(email));
+          if (resp.ok) {
+            const data = await resp.json();
+            safeSet('glaeubiger', data.glaeubiger);
+            safeSet('firstname', data.firstname);
+            safeSet('name', data.name);
+            safeSet('strasse', data.strasse);
+            safeSet('hausnummer', data.hausnummer);
+            safeSet('plz', data.plz);
+            safeSet('ort', data.ort);
+            safeSet('country', data.country);
+          } else {
+            // Falls es die Funktion (noch) nicht gibt, leise ignorieren
+            if (document.getElementById('glaeubiger').value === '') {
+              // Gläubiger leer lassen – bleibt readonly, aber required (wird durch backend nicht zwingend benötigt)
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('Prefill skipped:', e);
+      }
+
+      // Sprachumschalter
+      document.getElementById('language').addEventListener('change', (e) => {
+        const lang = e.target.value;
+        document.getElementById('lang').value = lang;
+        setLanguage(lang);
       });
 
-      if (response.ok) {
-        window.location.href = "danke.html";
-      } else {
-        const txt = await response.text();
-        alert(`Fehler (${response.status}): ${txt}`);
-        console.error("Server response:", txt);
-      }
-    } catch (err) {
-      alert("Netzwerk-/Script-Fehler: " + err.message);
-      console.error(err);
-    }
-  });
-</script>
-
+      // Client-Validation
+      document.getElementById('verify-form').addEventListener('submit', (e) => {
+        const lang = document.getElementById('lang').value || 'de';
+        const dict = i18n[lang] || i18n.de;
+        const requiredIds = ['firstname','name','strasse','hausnummer','plz','ort','country'];
+        let ok = true;
+        for (const id of requiredIds) {
+          const val = (document.getElementById(id).value || '').trim();
+          if (!val) { ok = false; break; }
+        }
+        if (!ok || !document.getElementById('confirm').checked || !document.getElementById('privacy').checked) {
+          e.preventDefault();
+          const el = document.getElementById('error');
+          el.textContent = dict.required;
+          el.style.display = 'block';
+          return false;
+        }
+        // Fehlertext ausblenden
+        document.getElementById('error').style.display = 'none';
+        return true;
+      });
+    })();
+  </script>
 </body>
 </html>
