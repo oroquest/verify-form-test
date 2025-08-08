@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Sikura – Adressbestaetigung</title>
+  <title>Sikura – Adressbestätigung</title>
   <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; background:#f5f6f8; margin:0; }
     .container { max-width:760px; margin:32px auto; background:#fff; padding:24px; border-radius:14px; box-shadow:0 8px 24px rgba(0,0,0,.06); }
@@ -39,8 +39,8 @@
     </div>
 
     <img src="siku_logo.png" alt="Sikura Life" class="logo" />
-    <h2 id="title">Bitte bestaetigen Sie Ihre Adresse</h2>
-    <p id="intro" class="hint">Felder sind vorbefuellt und koennen bei Bedarf aktualisiert werden.</p>
+    <h2 id="title">Bitte bestätigen Sie Ihre Adresse</h2>
+    <p id="intro" class="hint">Felder sind vorbefüllt und können bei Bedarf aktualisiert werden.</p>
 
     <div id="ctx-box" class="ctx"></div>
 
@@ -55,7 +55,7 @@
       <input type="hidden" id="token" name="token" />
       <input type="hidden" id="em"    name="em"    />
 
-      <label for="glaeubiger" id="lbl-glaeubiger">Glaeubiger‑Nr.</label>
+      <label for="glaeubiger" id="lbl-glaeubiger">Gläubiger‑Nr.</label>
       <input type="text" id="glaeubiger" name="glaeubiger" readonly required />
       <div class="hint" id="hint-glaeubiger"></div>
 
@@ -100,14 +100,14 @@
       <div class="checkbox-group">
         <label class="checkbox-line">
           <input type="checkbox" id="confirm" name="confirm" required />
-          <span id="txt-confirm">Ich bestaetige, dass die angegebenen Daten korrekt sind.</span>
+          <span id="txt-confirm">Ich bestätige, dass die angegebenen Daten korrekt sind.</span>
         </label>
         <div class="hint" id="hint-confirm"></div>
       </div>
       <div class="checkbox-group">
         <label class="checkbox-line">
           <input type="checkbox" id="privacy" name="privacy" required />
-          <span id="txt-privacy">Ich stimme der Verarbeitung meiner Daten gemaess DSGVO zu.</span>
+          <span id="txt-privacy">Ich stimme der Verarbeitung meiner Daten gemäss DSGVO zu.</span>
         </label>
         <div class="hint" id="hint-privacy"></div>
       </div>
@@ -115,7 +115,7 @@
       <div id="error" class="error"></div>
 
       <button type="submit" id="btn-submit">Absenden</button>
-      <div class="hint" id="hint-expiry">Hinweis: Der Bestaetigungslink ist aus Sicherheitsgruenden 7 Tage gueltig.</div>
+      <div class="hint" id="hint-expiry">Hinweis: Der Bestätigungslink ist aus Sicherheitsgründen 7 Tage gültig.</div>
     </form>
   </div>
 
@@ -123,10 +123,10 @@
     // --------- I18N ---------
     const i18n = {
       de: {
-        title: "Bitte bestaetigen Sie Ihre Adresse",
-        intro: "Felder sind vorbefuellt und koennen bei Bedarf aktualisiert werden.",
-        ctx: "Bitte prufen Sie die vorbefuellten Angaben. Felder mit * sind Pflicht. Zum Absenden muessen Sie die Datenbestaetigung und die DSGVO-Einwilligung aktivieren.",
-        glaeubiger: "Glaeubiger‑Nr.",
+        title: "Bitte bestätigen Sie Ihre Adresse",
+        intro: "Felder sind vorbefüllt und können bei Bedarf aktualisiert werden.",
+        ctx: "Bitte prüfen Sie die vorbefüllten Angaben. Felder mit * sind Pflicht. Zum Absenden müssen Sie die Datenbestätigung und die DSGVO‑Einwilligung aktivieren.",
+        glaeubiger: "Gläubiger‑Nr.",
         firstname: "Vorname",
         name: "Name",
         strasse: "Strasse",
@@ -134,27 +134,27 @@
         plz: "PLZ",
         ort: "Ort",
         country: "Land",
-        hintGlaeubiger: "Nummer des Anspruchsberechtigten. Dieses Feld ist schreibgeschuetzt.",
-        hintFirst: "Rufname gemaess Postanschrift (ohne Titel).",
-        hintName: "Familienname gemaess offizieller Adresse.",
+        hintGlaeubiger: "Nummer des Anspruchsberechtigten. Dieses Feld ist schreibgeschützt.",
+        hintFirst: "Rufname gemäss Postanschrift (ohne Titel).",
+        hintName: "Familienname gemäss offizieller Adresse.",
         hintStrasse: "Strassenname ohne Hausnummer.",
         hintHausnummer: "Nur Ziffern und Zusatz (z. B. 12a).",
-        hintZIP: "Nur Ziffern, z. B. 8001.",
-        hintOrt: "Ort/Gemeinde gemaess Adresse.",
-        hintCountry: "Staat in Klartext, z. B. Schweiz, Italia, Germany.",
-        confirm: "Ich bestaetige, dass die angegebenen Daten korrekt sind.",
-        privacy: "Ich stimme der Verarbeitung meiner Daten gemaess DSGVO zu.",
-        hintConfirm: "Erforderlich, damit wir die Adresse verlaesslich uebernehmen koennen.",
-        hintPrivacy: "Erforderlich, damit wir Ihre Daten gemaess DSGVO verarbeiten duerfen.",
+        hintZIP: "Nur Ziffern, z. B. 8001.",
+        hintOrt: "Ort/Gemeinde gemäss Adresse.",
+        hintCountry: "Staat in Klartext, z. B. Schweiz, Italia, Germany.",
+        confirm: "Ich bestätige, dass die angegebenen Daten korrekt sind.",
+        privacy: "Ich stimme der Verarbeitung meiner Daten gemäss DSGVO zu.",
+        hintConfirm: "Erforderlich, damit wir die Adresse sicher übernehmen können.",
+        hintPrivacy: "Erforderlich, damit wir Ihre Daten gemäss DSGVO verarbeiten dürfen.",
         submit: "Absenden",
-        requiredGeneric: "Bitte fuellen Sie alle Pflichtfelder aus.",
-        requiredList: "Bitte ergaenzen: {fields}.",
-        requiredConfirm: "Bitte bestaetigen Sie, dass die Angaben korrekt sind.",
+        requiredGeneric: "Bitte füllen Sie alle Pflichtfelder aus.",
+        requiredList: "Bitte ergänzen: {fields}.",
+        requiredConfirm: "Bitte bestätigen Sie, dass die Angaben korrekt sind.",
         requiredPrivacy: "Bitte stimmen Sie der DSGVO‑Verarbeitung zu.",
-        expiry: "Hinweis: Der Bestaetigungslink ist aus Sicherheitsgruenden 7 Tage gueltig.",
-        gateFail: "Verifizierung fehlgeschlagen. Der Link ist ungueltig oder abgelaufen.",
-        gateWarn: "⚠ Hinweis: Testmodus – Der Link waere abgelaufen, das Formular ist dennoch verfuegbar.",
-        gateOk: "Link geprueft – Formular freigeschaltet."
+        expiry: "Hinweis: Der Bestätigungslink ist aus Sicherheitsgründen 7 Tage gültig.",
+        gateFail: "Verifizierung fehlgeschlagen. Der Link ist ungültig oder abgelaufen.",
+        gateWarn: "⚠ Hinweis: Testmodus – Der Link wäre abgelaufen, das Formular ist dennoch verfügbar.",
+        gateOk: "Link geprüft – Formular freigeschaltet."
       },
       it: {
         title: "Per favore conferma il tuo indirizzo",
@@ -166,7 +166,7 @@
         strasse: "Via",
         hausnummer: "Nr.",
         plz: "CAP",
-        ort: "Citta",
+        ort: "Città",
         country: "Paese",
         hintGlaeubiger: "Numero dell’avente diritto. Campo di sola lettura.",
         hintFirst: "Nome proprio come nell’indirizzo postale (senza titoli).",
@@ -174,20 +174,20 @@
         hintStrasse: "Nome della via senza numero civico.",
         hintHausnummer: "Solo cifre ed eventuale suffisso (es. 12a).",
         hintZIP: "Solo numeri, es. 00100.",
-        hintOrt: "Citta/comune secondo l’indirizzo.",
+        hintOrt: "Città/comune secondo l’indirizzo.",
         hintCountry: "Paese in chiaro, es. Svizzera, Italia, Germany.",
         confirm: "Confermo che i dati forniti sono corretti.",
         privacy: "Acconsento al trattamento dei miei dati secondo il GDPR.",
         hintConfirm: "Obbligatorio per poter recepire correttamente l’indirizzo.",
-        hintPrivacy: "Obbligatorio per trattare i dati secondo il GDPR.",
+        hintPrivacy: "Obbligatorio per trattare i tuoi dati secondo il GDPR.",
         submit: "Invia",
         requiredGeneric: "Compila tutti i campi obbligatori.",
         requiredList: "Completa: {fields}.",
         requiredConfirm: "Conferma che i dati inseriti sono corretti.",
         requiredPrivacy: "Acconsenti al trattamento dei dati (GDPR).",
-        expiry: "Nota: Per motivi di sicurezza il link e valido per 7 giorni.",
-        gateFail: "Verifica non riuscita. Il link non e valido o e scaduto.",
-        gateWarn: "⚠ Avviso: Modalita test – Il link sarebbe scaduto, il modulo e comunque disponibile.",
+        expiry: "Nota: Per motivi di sicurezza il link è valido per 7 giorni.",
+        gateFail: "Verifica non riuscita. Il link non è valido o è scaduto.",
+        gateWarn: "⚠ Avviso: Modalità test – Il link sarebbe scaduto, il modulo è comunque disponibile.",
         gateOk: "Link verificato – modulo abilitato."
       },
       en: {
@@ -328,19 +328,19 @@
         email = qs('email') || "";
       }
 
-      // Hidden-Felder fuer den Submit setzen
+      // Hidden-Felder für den Submit setzen
       safeSet('email', email);
       safeSet('id',    id);
       safeSet('token', token);
       safeSet('em',    em);
 
-      // Daten von Server holen und Token/ID pruefen
+      // Daten von Server holen und Token/ID prüfen
       try {
         const resp = await fetch('/.netlify/functions/get_contact?id=' + encodeURIComponent(email));
         if (!resp.ok) throw new Error('lookup failed');
         const data = await resp.json();
 
-        // Pruefen: id (glaeubiger) & token aus Mailjet
+        // Prüfen: id (gläubiger) & token aus Mailjet
         const glaeubiger = (data.glaeubiger ?? data['gläubiger'] ?? "").toString().trim();
 
         safeSet('glaeubiger', glaeubiger);
@@ -370,7 +370,7 @@
         el.classList.remove('hidden');
       }
 
-      // Client-Validation (praezise)
+      // Client-Validation (präzise)
       document.getElementById('verify-form').addEventListener('submit', (e) => {
         const langEl = document.getElementById('lang').value;
         const dict = i18n[langEl] || i18n.de;
