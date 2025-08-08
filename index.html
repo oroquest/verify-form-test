@@ -5,11 +5,11 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Sikura – Adressbestätigung</title>
   <style>
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; background:#f7f7f8; margin:0; }
-    .container { max-width:720px; margin:32px auto; background:#fff; padding:24px; border-radius:14px; box-shadow:0 4px 16px rgba(0,0,0,.06); }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; background:#f5f6f8; margin:0; }
+    .container { max-width:760px; margin:32px auto; background:#fff; padding:24px; border-radius:14px; box-shadow:0 8px 24px rgba(0,0,0,.06); }
     .row { display:flex; gap:16px; }
     .row > div { flex:1; }
-    label { display:block; margin:14px 0 6px; font-weight:600; }
+    label { display:block; margin:12px 0 6px; font-weight:600; }
     input[type="text"], input[type="email"], textarea, select {
       width:100%; padding:12px; border:1px solid #d1d5db; border-radius:10px; font-size:16px; background:#fff;
     }
@@ -19,9 +19,11 @@
     .checkbox-line { display:flex; gap:8px; align-items:flex-start; }
     .hint { font-size:14px; color:#6b7280; margin-top:6px; }
     .error { color:#b91c1c; margin:10px 0; display:none; }
-    button { margin-top:18px; padding:12px 18px; border:0; background:#111827; color:#fff; border-radius:10px; font-size:16px; cursor:pointer; }
+    .ok { color:#065f46; margin:10px 0; display:none; }
+    button { margin-top:18px; padding:12px 18px; border:0; background:#0f172a; color:#fff; border-radius:10px; font-size:16px; cursor:pointer; }
     button:disabled { opacity:.6; cursor:not-allowed; }
     .logo { height:48px; margin-bottom:12px; }
+    .hidden { display:none; }
   </style>
 </head>
 <body>
@@ -38,8 +40,11 @@
     <h2 id="title">Bitte bestätigen Sie Ihre Adresse</h2>
     <p id="intro" class="hint">Felder sind vorbefüllt und können bei Bedarf aktualisiert werden.</p>
 
-    <form id="verify-form" method="POST" action="/.netlify/functions/verify_submit">
-      <!-- Hidden: email/id/lang (id=email laut aktuellem Flow) -->
+    <div id="gate-error" class="error hidden"></div>
+    <div id="gate-ok" class="ok hidden"></div>
+
+    <form id="verify-form" class="hidden" method="POST" action="/.netlify/functions/verify_submit">
+      <!-- Hidden: email/lang (id & token bleiben in URL) -->
       <input type="hidden" id="email" name="email" />
       <input type="hidden" id="lang" name="lang" />
 
@@ -98,7 +103,7 @@
   </div>
 
   <script>
-    // --- I18N ---
+    // --------- I18N ---------
     const i18n = {
       de: {
         title: "Bitte bestätigen Sie Ihre Adresse",
@@ -115,7 +120,10 @@
         privacy: "Ich stimme der Verarbeitung meiner Daten gemäss DSGVO zu.",
         submit: "Absenden",
         required: "Bitte füllen Sie alle Pflichtfelder aus.",
-        expiry: "Hinweis: Der Bestätigungslink ist aus Sicherheitsgründen 7 Tage gültig."
+        expiry: "Hinweis: Der Bestätigungslink ist aus Sicherheitsgründen 7 Tage gültig.",
+        gateFail: "Verifizierung fehlgeschlagen. Der Link ist ungültig oder abgelaufen.",
+        gateWarn: "⚠ Hinweis: Testmodus – Der Link wäre abgelaufen, das Formular ist dennoch verfügbar.",
+        gateOk: "Link geprüft – Formular freigeschaltet."
       },
       it: {
         title: "Per favore conferma il tuo indirizzo",
@@ -132,7 +140,10 @@
         privacy: "Acconsento al trattamento dei miei dati secondo il GDPR.",
         submit: "Invia",
         required: "Per favore compila tutti i campi obbligatori.",
-        expiry: "Nota: Per motivi di sicurezza il link è valido per 7 giorni."
+        expiry: "Nota: Per motivi di sicurezza il link è valido per 7 giorni.",
+        gateFail: "Verifica non riuscita. Il link non è valido o è scaduto.",
+        gateWarn: "⚠ Avviso: Modalità test – Il link sarebbe scaduto, il modulo è comunque disponibile.",
+        gateOk: "Link verificato – modulo abilitato."
       },
       en: {
         title: "Please confirm your address",
@@ -149,32 +160,54 @@
         privacy: "I consent to the processing of my data under GDPR.",
         submit: "Submit",
         required: "Please fill in all required fields.",
-        expiry: "Note: For security, the confirmation link is valid for 7 days."
+        expiry: "Note: For security, the confirmation link is valid for 7 days.",
+        gateFail: "Verification failed. The link is invalid or expired.",
+        gateWarn: "⚠ Notice: Test mode – The link would be expired, the form is still available.",
+        gateOk: "Link verified – form enabled."
       }
     };
 
     function setLanguage(lang) {
-      const dict = i18n[lang] || i18n.de;
+      const d = i18n[lang] || i18n.de;
       document.documentElement.lang = lang;
-      document.getElementById('title').textContent = dict.title;
-      document.getElementById('intro').textContent = dict.intro;
-      document.getElementById('lbl-glaeubiger').textContent = dict.glaeubiger;
-      document.getElementById('lbl-firstname').textContent = dict.firstname;
-      document.getElementById('lbl-name').textContent = dict.name;
-      document.getElementById('lbl-strasse').textContent = dict.strasse;
-      document.getElementById('lbl-hausnummer').textContent = dict.hausnummer;
-      document.getElementById('lbl-plz').textContent = dict.plz;
-      document.getElementById('lbl-ort').textContent = dict.ort;
-      document.getElementById('lbl-country').textContent = dict.country;
-      document.getElementById('txt-confirm').textContent = dict.confirm;
-      document.getElementById('txt-privacy').textContent = dict.privacy;
-      document.getElementById('btn-submit').textContent = dict.submit;
-      document.getElementById('hint-expiry').textContent = dict.expiry;
+      document.getElementById('title').textContent = d.title;
+      document.getElementById('intro').textContent = d.intro;
+      document.getElementById('lbl-glaeubiger').textContent = d.glaeubiger;
+      document.getElementById('lbl-firstname').textContent = d.firstname;
+      document.getElementById('lbl-name').textContent = d.name;
+      document.getElementById('lbl-strasse').textContent = d.strasse;
+      document.getElementById('lbl-hausnummer').textContent = d.hausnummer;
+      document.getElementById('lbl-plz').textContent = d.plz;
+      document.getElementById('lbl-ort').textContent = d.ort;
+      document.getElementById('lbl-country').textContent = d.country;
+      document.getElementById('txt-confirm').textContent = d.confirm;
+      document.getElementById('txt-privacy').textContent = d.privacy;
+      document.getElementById('btn-submit').textContent = d.submit;
+      document.getElementById('hint-expiry').textContent = d.expiry;
     }
 
-    function getQS(name) {
-      const params = new URLSearchParams(location.search);
-      return params.get(name) || "";
+    function qs(name) {
+      const p = new URLSearchParams(location.search);
+      return p.get(name) || "";
+    }
+
+    // Base64URL decode (without padding)
+    function b64urlDecode(str) {
+      try {
+        let s = str.replace(/-/g,'+').replace(/_/g,'/');
+        // add padding if removed
+        while (s.length % 4 !== 0) s += '=';
+        return decodeURIComponent(escape(atob(s)));
+      } catch (e) {
+        // Fallback ohne escape (neuere Browser)
+        try {
+          let s = str.replace(/-/g,'+').replace(/_/g,'/');
+          while (s.length % 4 !== 0) s += '=';
+          return atob(s);
+        } catch (err) {
+          return "";
+        }
+      }
     }
 
     function safeSet(id, value) {
@@ -183,56 +216,80 @@
       }
     }
 
-    // --- Prefill Logik ---
     (async function init() {
       // Sprache
-      const qsLang = (getQS('lang') || '').toLowerCase();
-      const currentLang = ['de','it','en'].includes(qsLang) ? qsLang : 'de';
+      const lang = (qs('lang') || '').toLowerCase();
+      const currentLang = ['de','it','en'].includes(lang) ? lang : 'de';
       document.getElementById('language').value = currentLang;
       document.getElementById('lang').value = currentLang;
       setLanguage(currentLang);
+      document.getElementById('language').addEventListener('change', (e)=>{
+        const l = e.target.value;
+        document.getElementById('lang').value = l;
+        setLanguage(l);
+      });
 
-      // ID/E-Mail aus URL
-      const email = getQS('id') || getQS('email') || "";
-      safeSet('email', email);
+      // URL-Params
+      const id = qs('id');
+      const token = qs('token');
+      const em = qs('em');
 
-      // OPTIONAL: Prefill via Netlify Function (falls vorhanden)
-      // Erwartet ein JSON { glaeubiger, firstname, name, strasse, hausnummer, plz, ort, country }
-      try {
-        if (email) {
-          const resp = await fetch('/.netlify/functions/get_contact?id=' + encodeURIComponent(email));
-          if (resp.ok) {
-            const data = await resp.json();
-            safeSet('glaeubiger', data.glaeubiger);
-            safeSet('firstname', data.firstname);
-            safeSet('name', data.name);
-            safeSet('strasse', data.strasse);
-            safeSet('hausnummer', data.hausnummer);
-            safeSet('plz', data.plz);
-            safeSet('ort', data.ort);
-            safeSet('country', data.country);
-          } else {
-            // Falls es die Funktion (noch) nicht gibt, leise ignorieren
-            if (document.getElementById('glaeubiger').value === '') {
-              // Gläubiger leer lassen – bleibt readonly, aber required (wird durch backend nicht zwingend benötigt)
-            }
-          }
-        }
-      } catch (e) {
-        console.warn('Prefill skipped:', e);
+      // Guard: Muss vorhanden sein
+      if (!id || !token || !em) {
+        const msg = i18n[currentLang].gateFail;
+        const el = document.getElementById('gate-error'); el.textContent = msg; el.classList.remove('hidden');
+        return;
       }
 
-      // Sprachumschalter
-      document.getElementById('language').addEventListener('change', (e) => {
-        const lang = e.target.value;
-        document.getElementById('lang').value = lang;
-        setLanguage(lang);
-      });
+      // Email decodieren
+      const email = b64urlDecode(em).trim();
+      if (!email || !/@/.test(email)) {
+        const msg = i18n[currentLang].gateFail + " (E-Mail ungültig)";
+        const el = document.getElementById('gate-error'); el.textContent = msg; el.classList.remove('hidden');
+        return;
+      }
+      document.getElementById('email').value = email;
+
+      // Daten von Server holen und Token/ID prüfen
+      try {
+        const resp = await fetch('/.netlify/functions/get_contact?id=' + encodeURIComponent(email));
+        if (!resp.ok) throw new Error('lookup failed');
+        const data = await resp.json();
+
+        // Prüfen: id (gläubiger) & token aus Mailjet
+        const glaeubiger = (data.glaeubiger ?? data['gläubiger'] ?? "").toString().trim();
+        // hole zusätzliche Felder über zweiten Call verify_check? Wir prüfen minimal token clientseitig nicht, das erledigt Server beim Absenden/Check.
+
+        safeSet('glaeubiger', glaeubiger);
+        safeSet('firstname', data.firstname);
+        safeSet('name', data.name);
+        safeSet('strasse', data.strasse);
+        safeSet('hausnummer', data.hausnummer);
+        safeSet('plz', data.plz);
+        safeSet('ort', data.ort);
+        safeSet('country', data.country);
+
+        if (glaeubiger !== id) {
+          const el = document.getElementById('gate-error');
+          el.textContent = i18n[currentLang].gateFail + " (ID mismatch)";
+          el.classList.remove('hidden');
+          return;
+        }
+
+        // Alles ok → Formular freigeben
+        const ok = document.getElementById('gate-ok');
+        ok.textContent = i18n[currentLang].gateOk;
+        ok.classList.remove('hidden');
+        document.getElementById('verify-form').classList.remove('hidden');
+      } catch (e) {
+        const el = document.getElementById('gate-error');
+        el.textContent = i18n[currentLang].gateFail;
+        el.classList.remove('hidden');
+      }
 
       // Client-Validation
       document.getElementById('verify-form').addEventListener('submit', (e) => {
-        const lang = document.getElementById('lang').value || 'de';
-        const dict = i18n[lang] || i18n.de;
+        const dict = i18n[document.getElementById('lang').value] || i18n.de;
         const requiredIds = ['firstname','name','strasse','hausnummer','plz','ort','country'];
         let ok = true;
         for (const id of requiredIds) {
@@ -246,7 +303,6 @@
           el.style.display = 'block';
           return false;
         }
-        // Fehlertext ausblenden
         document.getElementById('error').style.display = 'none';
         return true;
       });
