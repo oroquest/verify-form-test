@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Sikura – Adressbestätigung</title>
+  <title>Sikura – Adressbestaetigung</title>
   <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; background:#f5f6f8; margin:0; }
     .container { max-width:760px; margin:32px auto; background:#fff; padding:24px; border-radius:14px; box-shadow:0 8px 24px rgba(0,0,0,.06); }
@@ -18,12 +18,14 @@
     .checkbox-group { margin-top:12px; }
     .checkbox-line { display:flex; gap:8px; align-items:flex-start; }
     .hint { font-size:14px; color:#6b7280; margin-top:6px; }
+    .ctx { background:#f9fafb; border:1px solid #e5e7eb; padding:12px; border-radius:10px; margin:12px 0 16px; }
     .error { color:#b91c1c; margin:10px 0; display:none; }
     .ok { color:#065f46; margin:10px 0; display:none; }
     button { margin-top:18px; padding:12px 18px; border:0; background:#0f172a; color:#fff; border-radius:10px; font-size:16px; cursor:pointer; }
     button:disabled { opacity:.6; cursor:not-allowed; }
     .logo { height:48px; margin-bottom:12px; }
     .hidden { display:none; }
+    .error-field { border-color:#b91c1c !important; }
   </style>
 </head>
 <body>
@@ -37,38 +39,44 @@
     </div>
 
     <img src="siku_logo.png" alt="Sikura Life" class="logo" />
-    <h2 id="title">Bitte bestätigen Sie Ihre Adresse</h2>
-    <p id="intro" class="hint">Felder sind vorbefüllt und können bei Bedarf aktualisiert werden.</p>
+    <h2 id="title">Bitte bestaetigen Sie Ihre Adresse</h2>
+    <p id="intro" class="hint">Felder sind vorbefuellt und koennen bei Bedarf aktualisiert werden.</p>
+
+    <div id="ctx-box" class="ctx"></div>
 
     <div id="gate-error" class="error hidden"></div>
     <div id="gate-ok" class="ok hidden"></div>
 
     <form id="verify-form" class="hidden" method="POST" action="/.netlify/functions/verify_submit">
-      <!-- Hidden: email/lang (id & token bleiben in URL) -->
+      <!-- Hidden: email/lang/id/token/em -->
       <input type="hidden" id="email" name="email" />
       <input type="hidden" id="lang" name="lang" />
-	  <input type="hidden" id="id"    name="id"    />
-<input type="hidden" id="token" name="token" />
-<input type="hidden" id="em"    name="em"    />
-	  
+      <input type="hidden" id="id"    name="id"    />
+      <input type="hidden" id="token" name="token" />
+      <input type="hidden" id="em"    name="em"    />
 
-      <label for="glaeubiger" id="lbl-glaeubiger">Gläubiger‑Nr.</label>
+      <label for="glaeubiger" id="lbl-glaeubiger">Glaeubiger‑Nr.</label>
       <input type="text" id="glaeubiger" name="glaeubiger" readonly required />
+      <div class="hint" id="hint-glaeubiger"></div>
 
       <label for="firstname" id="lbl-firstname">Vorname</label>
       <input type="text" id="firstname" name="firstname" required />
+      <div class="hint" id="hint-firstname"></div>
 
       <label for="name" id="lbl-name">Name</label>
       <input type="text" id="name" name="name" required />
+      <div class="hint" id="hint-name"></div>
 
       <div class="row">
         <div>
           <label for="strasse" id="lbl-strasse">Strasse</label>
           <input type="text" id="strasse" name="strasse" required />
+          <div class="hint" id="hint-strasse"></div>
         </div>
         <div style="max-width:180px;">
           <label for="hausnummer" id="lbl-hausnummer">Nr.</label>
           <input type="text" id="hausnummer" name="hausnummer" required />
+          <div class="hint" id="hint-hausnummer"></div>
         </div>
       </div>
 
@@ -76,33 +84,38 @@
         <div style="max-width:200px;">
           <label for="plz" id="lbl-plz">PLZ</label>
           <input type="text" id="plz" name="plz" required />
+          <div class="hint" id="hint-plz"></div>
         </div>
         <div>
           <label for="ort" id="lbl-ort">Ort</label>
           <input type="text" id="ort" name="ort" required />
+          <div class="hint" id="hint-ort"></div>
         </div>
       </div>
 
       <label for="country" id="lbl-country">Land</label>
       <input type="text" id="country" name="country" required />
+      <div class="hint" id="hint-country"></div>
 
       <div class="checkbox-group">
         <label class="checkbox-line">
           <input type="checkbox" id="confirm" name="confirm" required />
-          <span id="txt-confirm">Ich bestätige, dass die angegebenen Daten korrekt sind.</span>
+          <span id="txt-confirm">Ich bestaetige, dass die angegebenen Daten korrekt sind.</span>
         </label>
+        <div class="hint" id="hint-confirm"></div>
       </div>
       <div class="checkbox-group">
         <label class="checkbox-line">
           <input type="checkbox" id="privacy" name="privacy" required />
-          <span id="txt-privacy">Ich stimme der Verarbeitung meiner Daten gemäss DSGVO zu.</span>
+          <span id="txt-privacy">Ich stimme der Verarbeitung meiner Daten gemaess DSGVO zu.</span>
         </label>
+        <div class="hint" id="hint-privacy"></div>
       </div>
 
       <div id="error" class="error"></div>
 
       <button type="submit" id="btn-submit">Absenden</button>
-      <div class="hint" id="hint-expiry">Hinweis: Der Bestätigungslink ist aus Sicherheitsgründen 7 Tage gültig.</div>
+      <div class="hint" id="hint-expiry">Hinweis: Der Bestaetigungslink ist aus Sicherheitsgruenden 7 Tage gueltig.</div>
     </form>
   </div>
 
@@ -110,9 +123,10 @@
     // --------- I18N ---------
     const i18n = {
       de: {
-        title: "Bitte bestätigen Sie Ihre Adresse",
-        intro: "Felder sind vorbefüllt und können bei Bedarf aktualisiert werden.",
-        glaeubiger: "Gläubiger‑Nr.",
+        title: "Bitte bestaetigen Sie Ihre Adresse",
+        intro: "Felder sind vorbefuellt und koennen bei Bedarf aktualisiert werden.",
+        ctx: "Bitte prufen Sie die vorbefuellten Angaben. Felder mit * sind Pflicht. Zum Absenden muessen Sie die Datenbestaetigung und die DSGVO-Einwilligung aktivieren.",
+        glaeubiger: "Glaeubiger‑Nr.",
         firstname: "Vorname",
         name: "Name",
         strasse: "Strasse",
@@ -120,38 +134,66 @@
         plz: "PLZ",
         ort: "Ort",
         country: "Land",
-        confirm: "Ich bestätige, dass die angegebenen Daten korrekt sind.",
-        privacy: "Ich stimme der Verarbeitung meiner Daten gemäss DSGVO zu.",
+        hintGlaeubiger: "Nummer des Anspruchsberechtigten. Dieses Feld ist schreibgeschuetzt.",
+        hintFirst: "Rufname gemaess Postanschrift (ohne Titel).",
+        hintName: "Familienname gemaess offizieller Adresse.",
+        hintStrasse: "Strassenname ohne Hausnummer.",
+        hintHausnummer: "Nur Ziffern und Zusatz (z. B. 12a).",
+        hintZIP: "Nur Ziffern, z. B. 8001.",
+        hintOrt: "Ort/Gemeinde gemaess Adresse.",
+        hintCountry: "Staat in Klartext, z. B. Schweiz, Italia, Germany.",
+        confirm: "Ich bestaetige, dass die angegebenen Daten korrekt sind.",
+        privacy: "Ich stimme der Verarbeitung meiner Daten gemaess DSGVO zu.",
+        hintConfirm: "Erforderlich, damit wir die Adresse verlaesslich uebernehmen koennen.",
+        hintPrivacy: "Erforderlich, damit wir Ihre Daten gemaess DSGVO verarbeiten duerfen.",
         submit: "Absenden",
-        required: "Bitte füllen Sie alle Pflichtfelder aus.",
-        expiry: "Hinweis: Der Bestätigungslink ist aus Sicherheitsgründen 7 Tage gültig.",
-        gateFail: "Verifizierung fehlgeschlagen. Der Link ist ungültig oder abgelaufen.",
-        gateWarn: "⚠ Hinweis: Testmodus – Der Link wäre abgelaufen, das Formular ist dennoch verfügbar.",
-        gateOk: "Link geprüft – Formular freigeschaltet."
+        requiredGeneric: "Bitte fuellen Sie alle Pflichtfelder aus.",
+        requiredList: "Bitte ergaenzen: {fields}.",
+        requiredConfirm: "Bitte bestaetigen Sie, dass die Angaben korrekt sind.",
+        requiredPrivacy: "Bitte stimmen Sie der DSGVO‑Verarbeitung zu.",
+        expiry: "Hinweis: Der Bestaetigungslink ist aus Sicherheitsgruenden 7 Tage gueltig.",
+        gateFail: "Verifizierung fehlgeschlagen. Der Link ist ungueltig oder abgelaufen.",
+        gateWarn: "⚠ Hinweis: Testmodus – Der Link waere abgelaufen, das Formular ist dennoch verfuegbar.",
+        gateOk: "Link geprueft – Formular freigeschaltet."
       },
       it: {
         title: "Per favore conferma il tuo indirizzo",
         intro: "I campi sono precompilati e possono essere aggiornati se necessario.",
+        ctx: "Verifica i dati precompilati. I campi contrassegnati con * sono obbligatori. Per inviare, attiva la conferma dei dati e il consenso GDPR.",
         glaeubiger: "Numero del creditore",
         firstname: "Nome",
         name: "Cognome",
         strasse: "Via",
         hausnummer: "Nr.",
         plz: "CAP",
-        ort: "Città",
+        ort: "Citta",
         country: "Paese",
+        hintGlaeubiger: "Numero dell’avente diritto. Campo di sola lettura.",
+        hintFirst: "Nome proprio come nell’indirizzo postale (senza titoli).",
+        hintName: "Cognome come nell’indirizzo ufficiale.",
+        hintStrasse: "Nome della via senza numero civico.",
+        hintHausnummer: "Solo cifre ed eventuale suffisso (es. 12a).",
+        hintZIP: "Solo numeri, es. 00100.",
+        hintOrt: "Citta/comune secondo l’indirizzo.",
+        hintCountry: "Paese in chiaro, es. Svizzera, Italia, Germany.",
         confirm: "Confermo che i dati forniti sono corretti.",
         privacy: "Acconsento al trattamento dei miei dati secondo il GDPR.",
+        hintConfirm: "Obbligatorio per poter recepire correttamente l’indirizzo.",
+        hintPrivacy: "Obbligatorio per trattare i dati secondo il GDPR.",
         submit: "Invia",
-        required: "Per favore compila tutti i campi obbligatori.",
-        expiry: "Nota: Per motivi di sicurezza il link è valido per 7 giorni.",
-        gateFail: "Verifica non riuscita. Il link non è valido o è scaduto.",
-        gateWarn: "⚠ Avviso: Modalità test – Il link sarebbe scaduto, il modulo è comunque disponibile.",
+        requiredGeneric: "Compila tutti i campi obbligatori.",
+        requiredList: "Completa: {fields}.",
+        requiredConfirm: "Conferma che i dati inseriti sono corretti.",
+        requiredPrivacy: "Acconsenti al trattamento dei dati (GDPR).",
+        expiry: "Nota: Per motivi di sicurezza il link e valido per 7 giorni.",
+        gateFail: "Verifica non riuscita. Il link non e valido o e scaduto.",
+        gateWarn: "⚠ Avviso: Modalita test – Il link sarebbe scaduto, il modulo e comunque disponibile.",
         gateOk: "Link verificato – modulo abilitato."
       },
       en: {
         title: "Please confirm your address",
         intro: "Fields are pre-filled and can be updated if needed.",
+        ctx: "Please review the pre-filled details. Fields marked * are required. To submit, enable the data confirmation and GDPR consent.",
         glaeubiger: "Creditor No.",
         firstname: "First name",
         name: "Last name",
@@ -160,10 +202,23 @@
         plz: "ZIP",
         ort: "City",
         country: "Country",
+        hintGlaeubiger: "Number of the entitled party. This field is read-only.",
+        hintFirst: "Given name as on your postal address (no titles).",
+        hintName: "Family/last name as on the official address.",
+        hintStrasse: "Street name without house number.",
+        hintHausnummer: "Digits plus optional suffix (e.g., 12a).",
+        hintZIP: "Digits only, e.g., 10001.",
+        hintOrt: "City/municipality as on the address.",
+        hintCountry: "Country written out, e.g., Switzerland, Italia, Germany.",
         confirm: "I confirm that the information provided is correct.",
         privacy: "I consent to the processing of my data under GDPR.",
+        hintConfirm: "Required so we can safely adopt your address.",
+        hintPrivacy: "Required so we can process your data under GDPR.",
         submit: "Submit",
-        required: "Please fill in all required fields.",
+        requiredGeneric: "Please fill in all required fields.",
+        requiredList: "Please complete: {fields}.",
+        requiredConfirm: "Please confirm that the information is correct.",
+        requiredPrivacy: "Please provide GDPR consent.",
         expiry: "Note: For security, the confirmation link is valid for 7 days.",
         gateFail: "Verification failed. The link is invalid or expired.",
         gateWarn: "⚠ Notice: Test mode – The link would be expired, the form is still available.",
@@ -188,6 +243,24 @@
       document.getElementById('txt-privacy').textContent = d.privacy;
       document.getElementById('btn-submit').textContent = d.submit;
       document.getElementById('hint-expiry').textContent = d.expiry;
+      // Kontext und Hints
+      const box = document.getElementById('ctx-box'); if (box) box.textContent = d.ctx;
+      const map = [
+        ['hint-glaeubiger','hintGlaeubiger'],
+        ['hint-firstname','hintFirst'],
+        ['hint-name','hintName'],
+        ['hint-strasse','hintStrasse'],
+        ['hint-hausnummer','hintHausnummer'],
+        ['hint-plz','hintZIP'],
+        ['hint-ort','hintOrt'],
+        ['hint-country','hintCountry'],
+        ['hint-confirm','hintConfirm'],
+        ['hint-privacy','hintPrivacy'],
+      ];
+      for (const [id,key] of map) {
+        const el = document.getElementById(id);
+        if (el) el.textContent = d[key] || '';
+      }
     }
 
     function qs(name) {
@@ -199,11 +272,9 @@
     function b64urlDecode(str) {
       try {
         let s = str.replace(/-/g,'+').replace(/_/g,'/');
-        // add padding if removed
         while (s.length % 4 !== 0) s += '=';
         return decodeURIComponent(escape(atob(s)));
       } catch (e) {
-        // Fallback ohne escape (neuere Browser)
         try {
           let s = str.replace(/-/g,'+').replace(/_/g,'/');
           while (s.length % 4 !== 0) s += '=';
@@ -219,7 +290,11 @@
         document.getElementById(id).value = value;
       }
     }
-	
+
+    function labelFor(id) {
+      return (document.getElementById('lbl-'+id)?.textContent || id).trim();
+    }
+
     (async function init() {
       // Sprache
       const lang = (qs('lang') || '').toLowerCase();
@@ -246,32 +321,27 @@
       }
 
       // Email aus em (Base64URL) decodieren
-let email = "";
-if (em) {
-  email = b64urlDecode(em).trim();
-} else {
-  // Fallback (nur falls em fehlt)
-  email = qs('email') || "";
-}
+      let email = "";
+      if (em) {
+        email = b64urlDecode(em).trim();
+      } else {
+        email = qs('email') || "";
+      }
 
-// Hidden-Felder für den Submit setzen
-safeSet('email', email);
-safeSet('id',    id);
-safeSet('token', token);
-safeSet('em',    em);
+      // Hidden-Felder fuer den Submit setzen
+      safeSet('email', email);
+      safeSet('id',    id);
+      safeSet('token', token);
+      safeSet('em',    em);
 
-	  
-	  
-
-      // Daten von Server holen und Token/ID prüfen
+      // Daten von Server holen und Token/ID pruefen
       try {
         const resp = await fetch('/.netlify/functions/get_contact?id=' + encodeURIComponent(email));
         if (!resp.ok) throw new Error('lookup failed');
         const data = await resp.json();
 
-        // Prüfen: id (gläubiger) & token aus Mailjet
+        // Pruefen: id (glaeubiger) & token aus Mailjet
         const glaeubiger = (data.glaeubiger ?? data['gläubiger'] ?? "").toString().trim();
-        // hole zusätzliche Felder über zweiten Call verify_check? Wir prüfen minimal token clientseitig nicht, das erledigt Server beim Absenden/Check.
 
         safeSet('glaeubiger', glaeubiger);
         safeSet('firstname', data.firstname);
@@ -300,20 +370,41 @@ safeSet('em',    em);
         el.classList.remove('hidden');
       }
 
-      // Client-Validation
+      // Client-Validation (praezise)
       document.getElementById('verify-form').addEventListener('submit', (e) => {
-        const dict = i18n[document.getElementById('lang').value] || i18n.de;
-        const requiredIds = ['firstname','name','strasse','hausnummer','plz','ort','country'];
-        let ok = true;
-        for (const id of requiredIds) {
-          const val = (document.getElementById(id).value || '').trim();
-          if (!val) { ok = false; break; }
+        const langEl = document.getElementById('lang').value;
+        const dict = i18n[langEl] || i18n.de;
+
+        // Reset Highlights
+        const req = ['firstname','name','strasse','hausnummer','plz','ort','country'];
+        for (const id of req) {
+          document.getElementById(id).classList.remove('error-field');
         }
-        if (!ok || !document.getElementById('confirm').checked || !document.getElementById('privacy').checked) {
+
+        const missing = [];
+        for (const id of req) {
+          const el = document.getElementById(id);
+          if (!el.value || !el.value.trim()) {
+            missing.push(labelFor(id));
+            el.classList.add('error-field');
+          }
+        }
+
+        const errors = [];
+        if (missing.length) {
+          errors.push(dict.requiredList.replace('{fields}', missing.join(', ')));
+        }
+        if (!document.getElementById('confirm').checked) errors.push(dict.requiredConfirm);
+        if (!document.getElementById('privacy').checked) errors.push(dict.requiredPrivacy);
+
+        if (errors.length) {
           e.preventDefault();
-          const el = document.getElementById('error');
-          el.textContent = dict.required;
-          el.style.display = 'block';
+          const errBox = document.getElementById('error');
+          errBox.innerHTML = errors.map(x=>`• ${x}`).join('<br/>');
+          errBox.style.display = 'block';
+          // Fokus auf erstes fehlerhaftes Feld
+          const firstErr = document.querySelector('.error-field') || document.getElementById('confirm') || document.getElementById('privacy');
+          if (firstErr && firstErr.focus) firstErr.focus();
           return false;
         }
         document.getElementById('error').style.display = 'none';
