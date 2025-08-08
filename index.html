@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Sikura – Adressbestätigung</title>
+  <title>Sikura – Adressbestaetigung</title>
   <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; background:#f5f6f8; margin:0; }
     .container { max-width:760px; margin:32px auto; background:#fff; padding:24px; border-radius:14px; box-shadow:0 8px 24px rgba(0,0,0,.06); }
@@ -40,8 +40,8 @@
     </div>
 
     <img src="siku_logo.png" alt="Sikura Life" class="logo" />
-    <h2 id="title">Bitte bestätigen Sie Ihre Adresse</h2>
-    <p id="intro" class="hint">Felder sind vorbefüllt und können bei Bedarf aktualisiert werden.</p>
+    <h2 id="title">Bitte bestaetigen Sie Ihre Adresse</h2>
+    <p id="intro" class="hint">Felder sind vorbefuellt und koennen bei Bedarf aktualisiert werden.</p>
 
     <div id="ctx-box" class="ctx"></div>
 
@@ -56,7 +56,7 @@
       <input type="hidden" id="token" name="token" />
       <input type="hidden" id="em"    name="em"    />
 
-      <label for="glaeubiger" id="lbl-glaeubiger">Gläubiger‑Nr.</label>
+      <label for="glaeubiger" id="lbl-glaeubiger">Glaeubiger‑Nr.</label>
       <input type="text" id="glaeubiger" name="glaeubiger" readonly required />
       <div class="hint" id="hint-glaeubiger"></div>
       <div class="field-error" id="err-glaeubiger"></div>
@@ -109,7 +109,7 @@
       <div class="checkbox-group">
         <label class="checkbox-line">
           <input type="checkbox" id="confirm" name="confirm" required />
-          <span id="txt-confirm">Ich bestätige, dass die angegebenen Daten korrekt sind.</span>
+          <span id="txt-confirm">Ich bestaetige, dass die angegebenen Daten korrekt sind.</span>
         </label>
         <div class="hint" id="hint-confirm"></div>
         <div class="field-error" id="err-confirm"></div>
@@ -117,14 +117,14 @@
       <div class="checkbox-group">
         <label class="checkbox-line">
           <input type="checkbox" id="privacy" name="privacy" required />
-          <span id="txt-privacy">Ich stimme der Verarbeitung meiner Daten gemäss DSGVO zu.</span>
+          <span id="txt-privacy">Ich stimme der Verarbeitung meiner Daten gemaess DSGVO zu.</span>
         </label>
         <div class="hint" id="hint-privacy"></div>
         <div class="field-error" id="err-privacy"></div>
       </div>
 
       <button type="submit" id="btn-submit">Absenden</button>
-      <div class="hint" id="hint-expiry">Hinweis: Der Bestätigungslink ist aus Sicherheitsgründen 7 Tage gültig.</div>
+      <div class="hint" id="hint-expiry">Hinweis: Der Bestaetigungslink ist aus Sicherheitsgruenden 7 Tage gueltig.</div>
     </form>
   </div>
 
@@ -132,11 +132,10 @@
     // --------- I18N ---------
     const i18n = {
       de: {
-        title: "Bitte bestätigen Sie Ihre Adresse",
-        intro: "Felder sind vorbefüllt und können bei Bedarf aktualisiert werden.",
-        // Hinweis ohne Sternchen-Bezug
-        ctx: "Bitte prüfen Sie die vorbefüllten Angaben und füllen Sie alle notwendigen Felder aus. Aktivieren Sie ausserdem die Datenbestätigung und die DSGVO‑Einwilligung.",
-        glaeubiger: "Gläubiger‑Nr.",
+        title: "Bitte bestaetigen Sie Ihre Adresse",
+        intro: "Felder sind vorbefuellt und koennen bei Bedarf aktualisiert werden.",
+        ctx: "Bitte pruefen Sie die vorbefuellten Angaben und fuellen Sie alle notwendigen Felder aus. Aktivieren Sie ausserdem die Datenbestaetigung und die DSGVO‑Einwilligung.",
+        glaeubiger: "Glaeubiger‑Nr.",
         firstname: "Vorname",
         name: "Name",
         strasse: "Strasse",
@@ -144,28 +143,31 @@
         plz: "PLZ",
         ort: "Ort",
         country: "Land",
-        hintGlaeubiger: "Nummer des Anspruchsberechtigten. Dieses Feld ist schreibgeschützt.",
-        hintFirst: "Rufname gemäss Postanschrift (ohne Titel).",
-        hintName: "Familienname gemäss offizieller Adresse.",
+        hintGlaeubiger: "Nummer des Anspruchsberechtigten. Dieses Feld ist schreibgeschuetzt.",
+        hintFirst: "Rufname gemaess Postanschrift (ohne Titel).",
+        hintName: "Familienname gemaess offizieller Adresse.",
         hintStrasse: "Strassenname ohne Hausnummer.",
         hintHausnummer: "Nur Ziffern (keine Buchstaben).",
         hintZIP: "Nur Ziffern (z. B. 8001).",
-        hintOrt: "Ort/Gemeinde gemäss Adresse.",
+        hintOrt: "Ort/Gemeinde gemaess Adresse.",
         hintCountry: "Staat in Klartext, z. B. Schweiz, Italia, Germany.",
-        confirm: "Ich bestätige, dass die angegebenen Daten korrekt sind.",
-        privacy: "Ich stimme der Verarbeitung meiner Daten gemäss DSGVO zu.",
-        hintConfirm: "Bitte aktivieren, damit wir die Adresse verlässlich übernehmen können.",
-        hintPrivacy: "Bitte aktivieren, damit wir Ihre Daten gemäss DSGVO verarbeiten dürfen.",
+        confirm: "Ich bestaetige, dass die angegebenen Daten korrekt sind.",
+        privacy: "Ich stimme der Verarbeitung meiner Daten gemaess DSGVO zu.",
+        hintConfirm: "Bitte aktivieren, damit wir die Adresse verlaesslich uebernehmen koennen.",
+        hintPrivacy: "Bitte aktivieren, damit wir Ihre Daten gemaess DSGVO verarbeiten duerfen.",
         submit: "Absenden",
-        // Inline-Fehlertexte
-        errRequired: "Pflichtfeld – bitte ausfüllen.",
+        errRequired: "Pflichtfeld – bitte ausfuellen.",
         errDigits: "Es sind nur Ziffern erlaubt.",
-        errConfirm: "Bitte bestätigen Sie die Richtigkeit der Angaben.",
+        errConfirm: "Bitte bestaetigen Sie die Richtigkeit der Angaben.",
         errPrivacy: "Bitte stimmen Sie der DSGVO‑Verarbeitung zu.",
-        expiry: "Hinweis: Der Bestätigungslink ist aus Sicherheitsgründen 7 Tage gültig.",
-        gateFail: "Verifizierung fehlgeschlagen. Der Link ist ungültig oder abgelaufen.",
-        gateWarn: "⚠ Hinweis: Testmodus – Der Link wäre abgelaufen, das Formular ist dennoch verfügbar.",
-        gateOk: "Link geprüft – Formular freigeschaltet."
+        errZIPLenCH: "PLZ muss 4 Ziffern haben (CH).",
+        errZIPLenLI: "PLZ muss 4 Ziffern haben (LI).",
+        errZIPLenIT: "CAP muss 5 Ziffern haben (IT).",
+        errZIPLenDE: "PLZ muss 5 Ziffern haben (DE).",
+        expiry: "Hinweis: Der Bestaetigungslink ist aus Sicherheitsgruenden 7 Tage gueltig.",
+        gateFail: "Verifizierung fehlgeschlagen. Der Link ist ungueltig oder abgelaufen.",
+        gateWarn: "⚠ Hinweis: Testmodus – Der Link waere abgelaufen, das Formular ist dennoch verfuegbar.",
+        gateOk: "Link geprueft – Formular freigeschaltet."
       },
       it: {
         title: "Per favore conferma il tuo indirizzo",
@@ -177,7 +179,7 @@
         strasse: "Via",
         hausnummer: "Nr.",
         plz: "CAP",
-        ort: "Città",
+        ort: "Citta",
         country: "Paese",
         hintGlaeubiger: "Numero dell’avente diritto. Campo di sola lettura.",
         hintFirst: "Nome proprio come nell’indirizzo postale (senza titoli).",
@@ -185,7 +187,7 @@
         hintStrasse: "Nome della via senza numero civico.",
         hintHausnummer: "Solo cifre (nessuna lettera).",
         hintZIP: "Solo numeri (es. 00100).",
-        hintOrt: "Città/comune secondo l’indirizzo.",
+        hintOrt: "Citta/comune secondo l’indirizzo.",
         hintCountry: "Paese in chiaro, es. Svizzera, Italia, Germany.",
         confirm: "Confermo che i dati forniti sono corretti.",
         privacy: "Acconsento al trattamento dei miei dati secondo il GDPR.",
@@ -196,9 +198,13 @@
         errDigits: "Sono consentite solo cifre.",
         errConfirm: "Conferma che i dati sono corretti.",
         errPrivacy: "Fornisci il consenso GDPR.",
-        expiry: "Nota: Per motivi di sicurezza il link è valido per 7 giorni.",
-        gateFail: "Verifica non riuscita. Il link non è valido o è scaduto.",
-        gateWarn: "⚠ Avviso: Modalità test – Il link sarebbe scaduto, il modulo è comunque disponibile.",
+        errZIPLenCH: "Il CAP deve avere 4 cifre (CH).",
+        errZIPLenLI: "Il CAP deve avere 4 cifre (LI).",
+        errZIPLenIT: "Il CAP deve avere 5 cifre (IT).",
+        errZIPLenDE: "Il CAP deve avere 5 cifre (DE).",
+        expiry: "Nota: Per motivi di sicurezza il link e valido per 7 giorni.",
+        gateFail: "Verifica non riuscita. Il link non e valido o e scaduto.",
+        gateWarn: "⚠ Avviso: Modalita test – Il link sarebbe scaduto, il modulo e comunque disponibile.",
         gateOk: "Link verificato – modulo abilitato."
       },
       en: {
@@ -230,6 +236,10 @@
         errDigits: "Digits only.",
         errConfirm: "Please confirm the information is correct.",
         errPrivacy: "Please provide GDPR consent.",
+        errZIPLenCH: "ZIP must be 4 digits (CH).",
+        errZIPLenLI: "ZIP must be 4 digits (LI).",
+        errZIPLenIT: "ZIP must be 5 digits (IT).",
+        errZIPLenDE: "ZIP must be 5 digits (DE).",
         expiry: "Note: For security, the confirmation link is valid for 7 days.",
         gateFail: "Verification failed. The link is invalid or expired.",
         gateWarn: "⚠ Notice: Test mode – The link would be expired, the form is still available.",
@@ -328,6 +338,17 @@
       if (before !== after) e.target.value = after;
     }
 
+    function normalizeCountry(raw) {
+      const s = (raw || "").trim().toLowerCase();
+      if (!s) return "";
+      // Common aliases
+      if (["ch","che","schweiz","switzerland","suisse","svizzera"].includes(s)) return "CH";
+      if (["li","liechtenstein","lichtenstein"].includes(s)) return "LI";
+      if (["it","ita","italien","italia","italy"].includes(s)) return "IT";
+      if (["de","deu","deutschland","germany","alemania"].includes(s)) return "DE";
+      return ""; // unknown → open rule
+    }
+
     (async function init() {
       // Sprache
       const lang = (qs('lang') || '').toLowerCase();
@@ -414,7 +435,20 @@
         el.addEventListener('blur',  () => {
           if (!el.value.trim()) { showError(id, 'errRequired'); }
           else if ((id==='hausnummer' || id==='plz') && /\\D/.test(el.value)) { showError(id, 'errDigits'); }
-          else { clearError(id); }
+          else {
+            // Extra: plz length depending on country
+            if (id === 'plz') {
+              const cc = normalizeCountry(document.getElementById('country').value);
+              const v = el.value.trim();
+              if (cc === 'CH' && v.length !== 4) { showError('plz','errZIPLenCH'); }
+              else if (cc === 'LI' && v.length !== 4) { showError('plz','errZIPLenLI'); }
+              else if (cc === 'IT' && v.length !== 5) { showError('plz','errZIPLenIT'); }
+              else if (cc === 'DE' && v.length !== 5) { showError('plz','errZIPLenDE'); }
+              else { clearError('plz'); }
+            } else {
+              clearError(id);
+            }
+          }
         });
       });
       ['confirm','privacy'].forEach(id => {
@@ -422,7 +456,15 @@
         el.addEventListener('change', () => clearError(id));
       });
 
-      // Submit-Validation (nur inline-Fehler, kein Sammelhinweis)
+      // On country change, revalidate PLZ immediately (useful when user edits country after plz)
+      document.getElementById('country').addEventListener('input', () => {
+        const el = document.getElementById('plz');
+        if (!el.value.trim()) return;
+        // trigger same blur logic for PLZ
+        el.dispatchEvent(new Event('blur'));
+      });
+
+      // Submit-Validation (inline errors only)
       document.getElementById('verify-form').addEventListener('submit', (e) => {
         let hasError = false;
 
@@ -436,6 +478,16 @@
             showError(id, 'errDigits'); hasError = true;
           }
         });
+
+        // Country-specific PLZ length
+        const cc = normalizeCountry(document.getElementById('country').value);
+        const plzV = (document.getElementById('plz').value || "").trim();
+        if (plzV) {
+          if (cc === 'CH' && plzV.length !== 4) { showError('plz','errZIPLenCH'); hasError = true; }
+          else if (cc === 'LI' && plzV.length !== 4) { showError('plz','errZIPLenLI'); hasError = true; }
+          else if (cc === 'IT' && plzV.length !== 5) { showError('plz','errZIPLenIT'); hasError = true; }
+          else if (cc === 'DE' && plzV.length !== 5) { showError('plz','errZIPLenDE'); hasError = true; }
+        }
 
         if (!document.getElementById('confirm').checked) { showError('confirm','errConfirm'); hasError = true; }
         if (!document.getElementById('privacy').checked) { showError('privacy','errPrivacy'); hasError = true; }
