@@ -5,40 +5,29 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Sikura – Adressbestätigung</title>
   <style>
-    :root{
-      --border:#d1d5db;
-      --muted:#6b7280;
-      --bg:#f5f6f8;
-      --error:#b91c1c;
-      --ok:#065f46;
-      --focus:#0f172a;
-    }
-    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; background:var(--bg); margin:0; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; background:#f5f6f8; margin:0; }
     .container { max-width:760px; margin:32px auto; background:#fff; padding:24px; border-radius:14px; box-shadow:0 8px 24px rgba(0,0,0,.06); }
     .row { display:flex; gap:16px; }
     .row > div { flex:1; }
     label { display:block; margin:12px 0 6px; font-weight:600; }
     input[type="text"], textarea, select {
-      width:100%; padding:12px; border:1px solid var(--border); border-radius:10px; font-size:16px; background:#fff;
-      outline:none;
-    }
-    input[type="text"]:focus, textarea:focus, select:focus {
-      border-color: var(--focus);
-      box-shadow: 0 0 0 3px rgba(15,23,42,.1);
+      width:100%; padding:12px; border:1px solid #d1d5db; border-radius:10px; font-size:16px; background:#fff;
     }
     input[readonly] { background:#f3f4f6; color:#6b7280; }
     .language-switcher { display:flex; justify-content:flex-end; margin-bottom:8px; }
     .checkbox-group { margin-top:12px; }
     .checkbox-line { display:flex; gap:8px; align-items:flex-start; }
-    .hint { font-size:14px; color:var(--muted); margin-top:6px; }
-    .ctx { background:#f9fafb; border:1px solid #e5e7eb; padding:12px; border-radius:10px; margin:12px 0 16px; font-size:14px; color:#374151;}
-    .field-error { color:var(--error); font-size:13px; margin-top:6px; display:none; }
-    .ok { color:var(--ok); margin:10px 0; display:none; }
+    .hint { font-size:14px; color:#6b7280; margin-top:6px; }
+    .ctx { background:#f9fafb; border:1px solid #e5e7eb; padding:12px; border-radius:10px; margin:12px 0 16px; }
+    .field-error { color:#b91c1c; font-size:13px; margin-top:4px; display:none; }
+    .ok { color:#065f46; margin:10px 0; display:none; }
     button { margin-top:18px; padding:12px 18px; border:0; background:#0f172a; color:#fff; border-radius:10px; font-size:16px; cursor:pointer; }
     button:disabled { opacity:.6; cursor:not-allowed; }
     .logo { height:48px; margin-bottom:12px; }
     .hidden { display:none; }
-    .error-field { border-color:var(--error) !important; }
+    .error-field { border-color:#b91c1c !important; }
+    /* subtle focus */
+    input:focus { outline: none; box-shadow: 0 0 0 3px rgba(59,130,246,.2); border-color:#60a5fa; }
   </style>
 </head>
 <body>
@@ -74,12 +63,12 @@
       <div class="field-error" id="err-glaeubiger"></div>
 
       <label for="firstname" id="lbl-firstname">Vorname</label>
-      <input type="text" id="firstname" name="firstname" required />
+      <input type="text" id="firstname" name="firstname" required readonly aria-readonly="true" />
       <div class="hint" id="hint-firstname"></div>
       <div class="field-error" id="err-firstname"></div>
 
       <label for="name" id="lbl-name">Nachname</label>
-      <input type="text" id="name" name="name" required />
+      <input type="text" id="name" name="name" required readonly aria-readonly="true" />
       <div class="hint" id="hint-name"></div>
       <div class="field-error" id="err-name"></div>
 
@@ -141,7 +130,6 @@
   </div>
 
   <script>
-    // I18N (texts aligned to your latest)
     const i18n = {
       de: {
         title: "Bitte bestätigen Sie Ihre Adresse",
@@ -191,8 +179,8 @@
         ort: "Località",
         country: "Paese",
         hintGlaeubiger: "Numero del creditore come da comunicazione.",
-        hintFirst: "Nome secondo l'indirizzo ufficiale.",
-        hintName: "Cognome secondo l'indirizzo ufficiale.",
+        hintFirst: "Nome secondo la carta d'identità.",
+        hintName: "Cognome secondo la carta d'identità.",
         hintStrasse: "Nome della via senza numero civico.",
         hintHausnummer: "Numero civico secondo l'indirizzo ufficiale.",
         hintZIP: "CAP secondo il paese (CH/LI = 4 cifre, DE/IT = 5 cifre).",
@@ -226,8 +214,8 @@
         ort: "City/Town",
         country: "Country",
         hintGlaeubiger: "Creditor number as stated in the letter.",
-        hintFirst: "First name as per official address.",
-        hintName: "Last name as per official address.",
+        hintFirst: "First name according to identity card.",
+        hintName: "Last name according to identity card.",
         hintStrasse: "Street name without house number.",
         hintHausnummer: "House number as per official address.",
         hintZIP: "ZIP code according to country (CH/LI = 4 digits, DE/IT = 5 digits).",
@@ -267,7 +255,6 @@
       document.getElementById('txt-privacy').textContent = d.privacy;
       document.getElementById('btn-submit').textContent = d.submit;
       document.getElementById('hint-expiry').textContent = d.expiry;
-      // Kontext und Hints
       const box = document.getElementById('ctx-box'); if (box) box.textContent = d.ctx;
       const map = [
         ['hint-glaeubiger','hintGlaeubiger'],
@@ -290,7 +277,7 @@
       return p.get(name) || "";
     }
 
-    // Base64URL decode (without padding)
+    // Base64URL decode
     function b64urlDecode(str) {
       try {
         let s = str.replace(/-/g,'+').replace(/_/g,'/');
@@ -301,9 +288,7 @@
           let s = str.replace(/-/g,'+').replace(/_/g,'/');
           while (s.length % 4 !== 0) s += '=';
           return atob(s);
-        } catch (err) {
-          return "";
-        }
+        } catch { return ""; }
       }
     }
 
@@ -327,6 +312,12 @@
       if (errEl) { errEl.textContent = ""; errEl.style.display = 'none'; }
     }
 
+    function onlyDigits(e) {
+      const before = e.target.value;
+      const after = before.replace(/\\D+/g, '');
+      if (before !== after) e.target.value = after;
+    }
+
     function normalizeCountry(raw) {
       const s = (raw || "").trim().toLowerCase();
       if (!s) return "";
@@ -347,27 +338,26 @@
         const l = e.target.value; document.getElementById('lang').value = l; setLanguage(l);
       });
 
-      // PLZ: digits-only filter while typing
-      document.getElementById('plz').addEventListener('input', (e) => {
-        e.target.value = e.target.value.replace(/\D+/g, '');
+      // PLZ digits-only
+      document.getElementById('plz').addEventListener('input', onlyDigits);
+
+      // lock readonly fields from paste via UI (optional hardening)
+      ['firstname','name'].forEach(id => {
+        const el = document.getElementById(id);
+        el.addEventListener('keydown', (e)=> e.preventDefault());
+        el.addEventListener('paste',  (e)=> e.preventDefault());
       });
 
       // URL-Params
-      const id = qs('id');
-      const token = qs('token');
-      const em = qs('em');
-
+      const id = qs('id'); const token = qs('token'); const em = qs('em');
       if (!id || !token || !em) {
         const err = i18n[currentLang].gateFail;
         const el = document.getElementById('gate-error'); el.textContent = err; el.classList.remove('hidden'); return;
       }
 
       const email = b64urlDecode(em).trim() || (qs('email') || "");
-
-      // Hidden for submit
       safeSet('email', email); safeSet('id', id); safeSet('token', token); safeSet('em', em);
 
-      // Fetch prefill
       try {
         const resp = await fetch('/.netlify/functions/get_contact?id=' + encodeURIComponent(email));
         if (!resp.ok) throw new Error('lookup failed');
@@ -380,23 +370,22 @@
         if (glaeubiger !== id) {
           const el = document.getElementById('gate-error');
           el.textContent = i18n[currentLang].gateFail + " (ID mismatch)";
-          el.classList.remove('hidden');
-          return;
+          el.classList.remove('hidden'); return;
         }
 
         const ok = document.getElementById('gate-ok');
         ok.textContent = i18n[currentLang].gateOk;
         ok.classList.remove('hidden');
         document.getElementById('verify-form').classList.remove('hidden');
-      } catch (e) {
+      } catch {
         const el = document.getElementById('gate-error');
         el.textContent = i18n[currentLang].gateFail;
         el.classList.remove('hidden');
       }
 
-      // Live-clear + blur validation
-      const req = ['firstname','name','strasse','hausnummer','plz','ort','country'];
-      req.forEach(id => {
+      // Validation hooks
+      const must = ['firstname','name','strasse','hausnummer','plz','ort','country'];
+      must.forEach(id => {
         const el = document.getElementById(id);
         el.addEventListener('input', () => clearError(id));
         el.addEventListener('blur',  () => validateField(id));
@@ -406,17 +395,12 @@
         el.addEventListener('change', () => clearError(id));
       });
 
-      // Revalidate PLZ on country change
       document.getElementById('country').addEventListener('input', () => {
-        const el = document.getElementById('plz');
-        if (!el.value.trim()) return;
-        validateField('plz');
+        const el = document.getElementById('plz'); if (!el.value.trim()) return; validateField('plz');
       });
 
-      // Submit validation
       document.getElementById('verify-form').addEventListener('submit', (e) => {
         let hasError = false;
-        const must = ['firstname','name','strasse','hausnummer','plz','ort','country'];
         must.forEach(id => { if (!validateField(id)) hasError = true; });
         const dict = i18n[document.getElementById('lang').value] || i18n.de;
         if (!document.getElementById('confirm').checked) { showError('confirm', dict.errConfirm); hasError = true; }
@@ -427,23 +411,19 @@
     })();
 
     function validateField(id) {
-      const langEl = document.getElementById('lang').value;
-      const dict = i18n[langEl] || i18n.de;
+      const dict = i18n[document.getElementById('lang').value] || i18n.de;
       const el = document.getElementById(id);
       clearError(id);
       const v = (el.value || "").trim();
       if (!v) { showError(id, dict.errRequired); return false; }
-
       if (id === 'plz') {
-        // Strict digits-only, then length by country
-        if (!/^\d+$/.test(v)) { showError('plz', dict.errDigits); return false; }
+        if (!/^\\d+$/.test(v)) { showError('plz', dict.errDigits); return false; }
         const cc = normalizeCountry(document.getElementById('country').value);
         if (cc === 'CH' && v.length !== 4) { showError('plz', dict.errZIPLenCH); return false; }
         if (cc === 'LI' && v.length !== 4) { showError('plz', dict.errZIPLenLI); return false; }
         if (cc === 'IT' && v.length !== 5) { showError('plz', dict.errZIPLenIT); return false; }
         if (cc === 'DE' && v.length !== 5) { showError('plz', dict.errZIPLenDE); return false; }
       }
-      // Hausnummer: no format validation (only required handled above)
       return true;
     }
 
