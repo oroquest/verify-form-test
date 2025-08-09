@@ -1,5 +1,5 @@
 // netlify/functions/verify_submit.js
-const MJ_PUBLIC = process.env.MJ_APIKEY_PUBLIC;
+const MJ_PUBLIC  = process.env.MJ_APIKEY_PUBLIC;
 const MJ_PRIVATE = process.env.MJ_APIKEY_PRIVATE;
 const mjAuth = 'Basic ' + Buffer.from(`${MJ_PUBLIC}:${MJ_PRIVATE}`).toString('base64');
 
@@ -29,6 +29,18 @@ function b64urlDecode(input) {
   try { return Buffer.from(s, 'base64').toString('utf8'); } catch { return ''; }
 }
 
+function firstIpFromHeader(xff) {
+  if (!xff) return '';
+  // e.g. "203.0.113.1, 70.41.3.18, 150.172.238.178"
+  const first = String(xff).split(',')[0].trim();
+  return first;
+}
+
+function sanitizeUA(ua) {
+  // remove control chars, trim, cap length
+  return String(ua || '').replace(/[\u0000-\u001F]+/g, '').trim().slice(0, 255);
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' };
@@ -46,7 +58,12 @@ exports.handler = async (event) => {
     return { statusCode: 400, body: 'Missing required parameters (id/token/email)' };
   }
 
-  const ip = event.headers['x-nf-client-connection-ip'] || event.headers['x-forwarded-for'] || 'unknown';
+  // Header auslesen
+  const H = event.headers || {};
+  const userAgent = sanitizeUA(H['user-agent'] || H['User-Agent'] || '');
+  const ip =
+    firstIpFromHeader(H['x-forwarded-for'] || H['X-Forwarded-For']) ||
+    H['x-nf-client-connection-ip'] || H['client-ip'] || H['x-real-ip'] || 'unknown';
   const timestamp = new Date().toISOString();
 
   try {
@@ -89,9 +106,10 @@ exports.handler = async (event) => {
     setIf('ort',        ort);
     setIf('country',    country);
 
-    // Audit
+    // Audit (wie bisher) + User-Agent neu
     setIf('ip_verify',        ip);
     setIf('timestamp_verify', timestamp);
+    setIf('agent_verify',     userAgent); // NEU
 
     if (updates.length === 0) {
       // Nichts zu tun -> trotzdem redirecten (kein Fehler für Nutzer)
