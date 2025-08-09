@@ -88,7 +88,7 @@
       <div class="row">
         <div style="max-width:200px;">
           <label for="plz" id="lbl-plz">PLZ</label>
-          <input type="text" id="plz" name="plz" required inputmode="numeric" pattern="\d*" autocomplete="postal-code" />
+          <input type="text" id="plz" name="plz" required inputmode="numeric" pattern="\\d*" autocomplete="postal-code" />
           <div class="hint" id="hint-plz"></div>
           <div class="field-error" id="err-plz"></div>
         </div>
@@ -122,6 +122,11 @@
         <div class="field-error" id="err-privacy"></div>
       </div>
 
+      <!-- Inserted privacy link under the privacy checkbox -->
+      <div class="hint">
+        <a id="privacy-link" href="privacy.html?lang=de" target="_blank" rel="noopener">Datenschutzhinweise</a>
+      </div>
+
       <button type="submit" id="btn-submit">Absenden</button>
       <div class="hint" id="hint-expiry">Hinweis: Der Bestätigungslink ist aus Sicherheitsgründen 7 Tage gültig.</div>
     </form>
@@ -151,6 +156,7 @@
         hintCountry: "Land gemäss offizieller Adresse.",
         confirm: "Ich bestätige, dass die angegebenen Daten korrekt sind.",
         privacy: "Ich stimme der Verarbeitung meiner Daten gemäss DSGVO zu.",
+        privacyLink: "Datenschutzhinweise",
         submit: "Absenden",
         errRequired: "Pflichtfeld – bitte ausfüllen.",
         errDigits: "Es sind nur Ziffern erlaubt.",
@@ -186,6 +192,7 @@
         hintCountry: "Paese secondo l'indirizzo ufficiale.",
         confirm: "Confermo che i dati forniti sono corretti.",
         privacy: "Acconsento al trattamento dei miei dati secondo il GDPR.",
+        privacyLink: "Informativa privacy",
         submit: "Invia",
         errRequired: "Campo obbligatorio – compila per favore.",
         errDigits: "Sono consentite solo cifre.",
@@ -221,6 +228,7 @@
         hintCountry: "Country as per official address.",
         confirm: "I confirm that the information provided is correct.",
         privacy: "I consent to the processing of my data under GDPR.",
+        privacyLink: "Privacy notice",
         submit: "Submit",
         errRequired: "Required field — please fill in.",
         errDigits: "Digits only.",
@@ -267,6 +275,12 @@
       for (const [id,key] of map) {
         const el = document.getElementById(id);
         if (el) el.textContent = d[key] || '';
+      }
+      // Update privacy link label + URL
+      const plink = document.getElementById('privacy-link');
+      if (plink) {
+        plink.textContent = d.privacyLink;
+        plink.href = `privacy.html?lang=${lang}`;
       }
     }
 
@@ -318,14 +332,14 @@
       // Block non-digits before they get in
       plzEl.addEventListener('beforeinput', (e) => {
         if (e.inputType === 'insertFromPaste' || e.inputType === 'insertFromDrop') return; // handled separately
-        if (typeof e.data === 'string' && /\D/.test(e.data)) {
+        if (typeof e.data === 'string' && /\\D/.test(e.data)) {
           e.preventDefault();
         }
       });
 
       // Sanitize on input (covers paste in many browsers)
       plzEl.addEventListener('input', (e) => {
-        const cleaned = e.target.value.replace(/\D+/g, '');
+        const cleaned = e.target.value.replace(/\\D+/g, '');
         if (e.target.value !== cleaned) e.target.value = cleaned;
       });
 
@@ -333,7 +347,7 @@
       plzEl.addEventListener('paste', (e) => {
         e.preventDefault();
         const text = (e.clipboardData || window.clipboardData).getData('text');
-        const onlyDigits = String(text).replace(/\D+/g, '');
+        const onlyDigits = String(text).replace(/\\D+/g, '');
         document.execCommand('insertText', false, onlyDigits);
       });
 
@@ -341,14 +355,14 @@
       plzEl.addEventListener('drop', (e) => {
         e.preventDefault();
         const text = (e.dataTransfer && e.dataTransfer.getData('text')) || '';
-        const onlyDigits = String(text).replace(/\D+/g, '');
+        const onlyDigits = String(text).replace(/\\D+/g, '');
         if (onlyDigits) plzEl.value = plzEl.value + onlyDigits;
         plzEl.dispatchEvent(new Event('input', { bubbles: true }));
       });
 
       // Also sanitize on blur
       plzEl.addEventListener('blur', () => {
-        const cleaned = plzEl.value.replace(/\D+/g, '');
+        const cleaned = plzEl.value.replace(/\\D+/g, '');
         if (plzEl.value !== cleaned) plzEl.value = cleaned;
       });
     });
@@ -455,9 +469,9 @@
 
       if (id === 'plz') {
         // sanitize again just in case
-        v = v.replace(/\D+/g, '');
+        v = v.replace(/\\D+/g, '');
         if (el.value !== v) el.value = v;
-        if (!/^\d+$/.test(v)) { showError('plz','errDigits'); return false; }
+        if (!/^\\d+$/.test(v)) { showError('plz','errDigits'); return false; }
         const cc = normalizeCountry(document.getElementById('country').value);
         if (cc === 'CH' && v.length !== 4) { showError('plz','errZIPLenCH'); return false; }
         if (cc === 'LI' && v.length !== 4) { showError('plz','errZIPLenLI'); return false; }
