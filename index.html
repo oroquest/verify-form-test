@@ -3,16 +3,14 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Sikura – Adressbestätigung</title>
+  <title>Sikura – Adressbestaetigung</title>
   <style>
     body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; background:#f5f6f8; margin:0; }
     .container { max-width:760px; margin:32px auto; background:#fff; padding:24px; border-radius:14px; box-shadow:0 8px 24px rgba(0,0,0,.06); }
     .row { display:flex; gap:16px; }
     .row > div { flex:1; }
     label { display:block; margin:12px 0 6px; font-weight:600; }
-    input[type="text"], textarea, select {
-      width:100%; padding:12px; border:1px solid #d1d5db; border-radius:10px; font-size:16px; background:#fff;
-    }
+    input[type="text"], textarea, select { width:100%; padding:12px; border:1px solid #d1d5db; border-radius:10px; font-size:16px; background:#fff; }
     input[readonly] { background:#f3f4f6; color:#6b7280; }
     .language-switcher { display:flex; justify-content:flex-end; margin-bottom:8px; }
     .checkbox-group { margin-top:12px; }
@@ -40,8 +38,8 @@
     </div>
 
     <img src="siku_logo.png" alt="Sikura Life" class="logo" />
-    <h2 id="title">Bitte bestätigen Sie Ihre Adresse</h2>
-    <p id="intro" class="hint">Felder sind vorbefüllt und können bei Bedarf aktualisiert werden.</p>
+    <h2 id="title">Bitte bestaetigen Sie Ihre Adresse</h2>
+    <p id="intro" class="hint">Felder sind vorbefuellt und koennen bei Bedarf aktualisiert werden.</p>
 
     <div id="ctx-box" class="ctx"></div>
 
@@ -56,7 +54,7 @@
       <input type="hidden" id="token" name="token" />
       <input type="hidden" id="em"    name="em"    />
 
-      <label for="glaeubiger" id="lbl-glaeubiger">Gläubiger‑Nr.</label>
+      <label for="glaeubiger" id="lbl-glaeubiger">Glaeubiger‑Nr.</label>
       <input type="text" id="glaeubiger" name="glaeubiger" readonly required />
       <div class="hint" id="hint-glaeubiger"></div>
       <div class="field-error" id="err-glaeubiger"></div>
@@ -109,7 +107,7 @@
       <div class="checkbox-group">
         <label class="checkbox-line">
           <input type="checkbox" id="confirm" name="confirm" required />
-          <span id="txt-confirm">Ich bestätige, dass die angegebenen Daten korrekt sind.</span>
+          <span id="txt-confirm">Ich bestaetige, dass die angegebenen Daten korrekt sind.</span>
         </label>
         <div class="hint" id="hint-confirm"></div>
         <div class="field-error" id="err-confirm"></div>
@@ -117,7 +115,7 @@
       <div class="checkbox-group">
         <label class="checkbox-line">
           <input type="checkbox" id="privacy" name="privacy" required />
-          <span id="txt-privacy">Ich stimme der Verarbeitung meiner Daten gemäss DSGVO zu.</span>
+          <span id="txt-privacy">Ich stimme der Verarbeitung meiner Daten gemaess DSGVO zu.</span>
         </label>
         <div class="hint" id="hint-privacy"></div>
         <div class="field-error" id="err-privacy"></div>
@@ -129,17 +127,17 @@
       </div>
 
       <button type="submit" id="btn-submit">Absenden</button>
-      <div class="hint" id="hint-expiry">Hinweis: Der Bestätigungslink ist aus Sicherheitsgründen 7 Tage gültig.</div>
+      <div class="hint" id="hint-expiry">Hinweis: Der Bestaetigungslink ist aus Sicherheitsgruenden 7 Tage gueltig.</div>
     </form>
   </div>
 
   <script>
     const i18n = {
       de: {
-        title: "Bitte bestätigen Sie Ihre Adresse",
-        intro: "Felder sind vorbefüllt und können bei Bedarf aktualisiert werden.",
-        ctx: "Bitte geben Sie Ihre vollständigen und korrekten Adressdaten ein.",
-        glaeubiger: "Gläubiger‑Nr.",
+        title: "Bitte bestaetigen Sie Ihre Adresse",
+        intro: "Felder sind vorbefuellt und koennen bei Bedarf aktualisiert werden.",
+        ctx: "Bitte geben Sie Ihre vollstaendigen und korrekten Adressdaten ein.",
+        glaeubiger: "Glaeubiger‑Nr.",
         firstname: "Vorname",
         name: "Nachname",
         strasse: "Strasse",
@@ -147,29 +145,33 @@
         plz: "PLZ",
         ort: "Ort",
         country: "Land",
-        hintGlaeubiger: "Nummer des Gläubigers.",
-        hintFirst: "Vorname gemäss Personalausweis.",
-        hintName: "Nachname gemäss Personalausweis.",
-        hintStrasse: "Strassenname gemäss offizieller Adresse ohne Hausnummer.",
-        hintHausnummer: "Hausnummer gemäss offizieller Adresse.",
-        hintZIP: "Postleitzahl gemäss Land (CH/LI = 4 Ziffern, DE/IT = 5 Ziffern).",
-        hintOrt: "Ort gemäss offizieller Adresse.",
-        hintCountry: "Land gemäss offizieller Adresse.",
-        confirm: "Ich bestätige, dass die angegebenen Daten korrekt sind.",
-        privacy: "Ich stimme der Verarbeitung meiner Daten gemäss DSGVO zu.",
+        hintGlaeubiger: "Nummer des Glaeubigers.",
+        hintFirst: "Vorname gemaess Personalausweis.",
+        hintName: "Nachname gemaess Personalausweis.",
+        hintStrasse: "Strassenname gemaess offizieller Adresse ohne Hausnummer.",
+        hintHausnummer: "Hausnummer gemaess offizieller Adresse.",
+        hintZIP: "Postleitzahl gemaess Land (CH/LI = 4 Ziffern, DE/IT = 5 Ziffern).",
+        hintOrt: "Ort gemaess offizieller Adresse.",
+        hintCountry: "Land gemaess offizieller Adresse.",
+        confirm: "Ich bestaetige, dass die angegebenen Daten korrekt sind.",
+        privacy: "Ich stimme der Verarbeitung meiner Daten gemaess DSGVO zu.",
         privacyLink: "Datenschutzhinweise",
         submit: "Absenden",
-        errRequired: "Pflichtfeld – bitte ausfüllen.",
+        errRequired: "Pflichtfeld – bitte ausfuellen.",
         errDigits: "Es sind nur Ziffern erlaubt.",
-        errConfirm: "Bitte bestätigen Sie die Richtigkeit der Angaben.",
+        errConfirm: "Bitte bestaetigen Sie die Richtigkeit der Angaben.",
         errPrivacy: "Bitte stimmen Sie der DSGVO‑Verarbeitung zu.",
         errZIPLenCH: "PLZ muss 4 Ziffern haben (CH).",
         errZIPLenLI: "PLZ muss 4 Ziffern haben (LI).",
         errZIPLenIT: "PLZ muss 5 Ziffern haben (IT).",
         errZIPLenDE: "PLZ muss 5 Ziffern haben (DE).",
-        expiry: "Hinweis: Der Bestätigungslink ist aus Sicherheitsgründen 7 Tage gültig.",
-        gateFail: "Verifizierung fehlgeschlagen. Der Link ist ungültig oder abgelaufen.",
-        gateOk: "Link geprüft – Formular freigeschaltet."
+        expiry: "Hinweis: Der Bestaetigungslink ist aus Sicherheitsgruenden 7 Tage gueltig.",
+        gateFail: "Verifizierung fehlgeschlagen. Der Link ist ungueltig oder abgelaufen.",
+        gateOk: "Link geprueft – Formular freigeschaltet.",
+        errInvalidToken: "Link ungueltig oder bereits verwendet.",
+        errTokenExpired: "Link abgelaufen.",
+        errTokenUsed: "Link bereits verwendet.",
+        errGeneric: "Es ist ein Fehler aufgetreten. Bitte versuchen Sie es spaeter erneut."
       },
       it: {
         title: "Per favore conferma il tuo indirizzo",
@@ -181,15 +183,15 @@
         strasse: "Via",
         hausnummer: "Nr.",
         plz: "CAP",
-        ort: "Città",
+        ort: "Citta",
         country: "Paese",
         hintGlaeubiger: "Numero del creditore come da comunicazione.",
-        hintFirst: "Nome secondo la carta d'identità.",
-        hintName: "Cognome secondo la carta d'identità.",
+        hintFirst: "Nome secondo la carta d'identita.",
+        hintName: "Cognome secondo la carta d'identita.",
         hintStrasse: "Nome della via senza numero civico.",
         hintHausnummer: "Numero civico secondo l'indirizzo ufficiale.",
         hintZIP: "CAP secondo il paese (CH/LI = 4 cifre, DE/IT = 5 cifre).",
-        hintOrt: "Località secondo l'indirizzo ufficiale.",
+        hintOrt: "Localita secondo l'indirizzo ufficiale.",
         hintCountry: "Paese secondo l'indirizzo ufficiale.",
         confirm: "Confermo che i dati forniti sono corretti.",
         privacy: "Acconsento al trattamento dei miei dati secondo il GDPR.",
@@ -203,9 +205,13 @@
         errZIPLenLI: "Il CAP deve avere 4 cifre (LI).",
         errZIPLenIT: "Il CAP deve avere 5 cifre (IT).",
         errZIPLenDE: "Il CAP deve avere 5 cifre (DE).",
-        expiry: "Nota: Per motivi di sicurezza il link è valido per 7 giorni.",
-        gateFail: "Verifica non riuscita. Il link non è valido o è scaduto.",
-        gateOk: "Link verificato – modulo abilitato."
+        expiry: "Nota: Per motivi di sicurezza il link e valido per 7 giorni.",
+        gateFail: "Verifica non riuscita. Il link non e valido o e scaduto.",
+        gateOk: "Link verificato – modulo abilitato.",
+        errInvalidToken: "Link non valido o gia utilizzato.",
+        errTokenExpired: "Link scaduto.",
+        errTokenUsed: "Link gia utilizzato.",
+        errGeneric: "Si e verificato un errore. Riprova piu tardi."
       },
       en: {
         title: "Please confirm your address",
@@ -241,7 +247,11 @@
         errZIPLenDE: "ZIP must be 5 digits (DE).",
         expiry: "Note: For security, the confirmation link is valid for 7 days.",
         gateFail: "Verification failed. The link is invalid or expired.",
-        gateOk: "Link verified – form enabled."
+        gateOk: "Link verified – form enabled.",
+        errInvalidToken: "Link invalid or already used.",
+        errTokenExpired: "Link expired.",
+        errTokenUsed: "Link already used.",
+        errGeneric: "An error occurred. Please try again later."
       }
     };
 
@@ -277,7 +287,6 @@
         const el = document.getElementById(id);
         if (el) el.textContent = d[key] || '';
       }
-      // Update privacy link text + href
       const plink = document.getElementById('privacy-link');
       if (plink) {
         plink.textContent = d.privacyLink;
@@ -326,7 +335,7 @@
       if (errEl) { errEl.textContent = ""; errEl.style.display = 'none'; }
     }
 
-    // Harden PLZ: block non-digits and sanitize
+    // Harden PLZ
     document.addEventListener('DOMContentLoaded', () => {
       const plzEl = document.getElementById('plz');
 
@@ -439,16 +448,62 @@
         validateField('plz');
       });
 
-      // Submit validation
-      document.getElementById('verify-form').addEventListener('submit', (e) => {
+      // Submit via AJAX (map server responses to localized messages)
+      const form = document.getElementById('verify-form');
+      form.addEventListener('submit', async (e) => {
         let hasError = false;
         const must = ['firstname','name','strasse','hausnummer','plz','ort','country'];
         must.forEach(id => { if (!validateField(id)) hasError = true; });
-        const dict = i18n[document.getElementById('lang').value] || i18n.de;
         if (!document.getElementById('confirm').checked) { showError('confirm', 'errConfirm'); hasError = true; }
         if (!document.getElementById('privacy').checked) { showError('privacy', 'errPrivacy'); hasError = true; }
         if (hasError) { e.preventDefault(); return false; }
-        return true;
+
+        e.preventDefault();
+        const dict = i18n[document.getElementById('lang').value] || i18n.de;
+
+        const fd = new FormData(form);
+        const body = new URLSearchParams(fd).toString();
+
+        const errBox = document.getElementById('gate-error');
+        errBox.classList.add('hidden');
+        errBox.textContent = '';
+
+        try {
+          const resp = await fetch(form.action, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+              'Accept': 'application/json',
+              'X-Requested-With': 'fetch'
+            },
+            body
+          });
+
+          if (resp.ok) {
+            const data = await resp.json().catch(() => ({}));
+            if (data && data.redirect) {
+              window.location.href = data.redirect;
+            } else if (resp.redirected) {
+              window.location.href = resp.url;
+            } else {
+              window.location.href = '/danke.html';
+            }
+            return;
+          }
+
+          let msg = dict.errGeneric;
+          if (resp.status === 403) msg = dict.errInvalidToken;
+          else if (resp.status === 410) msg = dict.errTokenExpired;
+          else if (resp.status === 409) msg = dict.errTokenUsed;
+
+          errBox.textContent = msg;
+          errBox.classList.remove('hidden');
+
+        } catch (err) {
+          const errBox2 = document.getElementById('gate-error');
+          errBox2.textContent = (i18n[document.getElementById('lang').value] || i18n.de).errGeneric;
+          errBox2.classList.remove('hidden');
+        }
       });
     })();
 
