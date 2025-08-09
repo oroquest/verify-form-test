@@ -3,23 +3,21 @@ const MJ_PUBLIC  = process.env.MJ_APIKEY_PUBLIC;
 const MJ_PRIVATE = process.env.MJ_APIKEY_PRIVATE;
 const mjAuth = 'Basic ' + Buffer.from(`${MJ_PUBLIC}:${MJ_PRIVATE}`).toString('base64');
 
-// Toggle: Ablauf erzwingen? (nur aktivieren, wenn ihr token_expiry befüllt)
-const ENFORCE_EXPIRY = false;
+// Feature-Toggles
+const ENFORCE_EXPIRY     = true;   // Token muss vor Ablauf genutzt werden
+const ENFORCE_SINGLE_USE = true;   // Token darf nur 1x genutzt werden
 
 function parseFormBody(event) {
   const ct = (event.headers['content-type'] || event.headers['Content-Type'] || '').toLowerCase();
   if (ct.includes('application/json')) {
     try { return JSON.parse(event.body || '{}'); } catch { return {}; }
   }
-  // x-www-form-urlencoded
   try {
     const params = new URLSearchParams(event.body || '');
     const obj = {};
     for (const [k, v] of params.entries()) obj[k] = v;
     return obj;
-  } catch {
-    return {};
-  }
+  } catch { return {}; }
 }
 
 function b64urlDecode(input) {
@@ -31,13 +29,10 @@ function b64urlDecode(input) {
 
 function firstIpFromHeader(xff) {
   if (!xff) return '';
-  // e.g. "203.0.113.1, 70.41.3.18, 150.172.238.178"
-  const first = String(xff).split(',')[0].trim();
-  return first;
+  return String(xff).split(',')[0].trim();
 }
 
 function sanitizeUA(ua) {
-  // remove control chars, trim, cap length
   return String(ua || '').replace(/[\u0000-\u001F]+/g, '').trim().slice(0, 255);
 }
 
@@ -58,31 +53,30 @@ exports.handler = async (event) => {
     return { statusCode: 400, body: 'Missing required parameters (id/token/email)' };
   }
 
-  // Header auslesen
+  // Request-Metadaten
   const H = event.headers || {};
   const userAgent = sanitizeUA(H['user-agent'] || H['User-Agent'] || '');
   const ip =
     firstIpFromHeader(H['x-forwarded-for'] || H['X-Forwarded-For']) ||
     H['x-nf-client-connection-ip'] || H['client-ip'] || H['x-real-ip'] || 'unknown';
-  const timestamp = new Date().toISOString();
+  const nowISO = new Date().toISOString();
 
   try {
-    // 1) Kontakt-Properties holen
-    const resp = await fetch(`https://api.mailjet.com/v3/REST/contactdata/${encodeURIComponent(email)}`, {
+    // 1) Mailjet Contact-Properties holen
+    const r = await fetch(`https://api.mailjet.com/v3/REST/contactdata/${encodeURIComponent(email)}`, {
       headers: { Authorization: mjAuth }
     });
-    if (!resp.ok) {
-      const t = await resp.text();
+    if (!r.ok) {
+      const t = await r.text();
       return { statusCode: 502, body: `Mailjet fetch failed: ${t}` };
     }
-    const json = await resp.json();
+    const json = await r.json();
     const propsArray = json.Data?.[0]?.Data || [];
     const props = Object.fromEntries(propsArray.map(p => [p.Name, p.Value]));
 
-    // 2) Validierung: Gläubiger + Token (+Expiry optional)
+    // 2) Pflicht-Validierungen
     const glaeubigerVal = (props['gläubiger'] ?? props['glaeubiger'] ?? '').toString().trim();
     const tokenVerify   = (props['token_verify'] || '').toString().trim();
-    const tokenExpiry   = props['token_expiry'] ? new Date(props['token_expiry']) : null;
 
     if (glaeubigerVal !== String(id).trim()) {
       return { statusCode: 403, body: 'ID mismatch' };
@@ -90,14 +84,33 @@ exports.handler = async (event) => {
     if (!tokenVerify || tokenVerify !== token) {
       return { statusCode: 403, body: 'Invalid token' };
     }
-    if (ENFORCE_EXPIRY && tokenExpiry && isFinite(tokenExpiry) && tokenExpiry < new Date()) {
-      return { statusCode: 410, body: 'Token expired' };
+
+    // 3) One-Time-Use prüfen (NEU: token_verify_used_at)
+    const tokenUsedAt = (props['token_verify_used_at'] || '').toString().trim();
+    if (ENFORCE_SINGLE_USE && tokenUsedAt) {
+      return { statusCode: 409, body: 'Token already used' };
     }
 
-    // 3) Updates vorbereiten (nur befüllte Felder überschreiben)
+    // 4) Ablauf prüfen (primär "Token_verify_expiry", sonst Fallbacks)
+    const expiryRaw =
+      props['Token_verify_expiry'] ||   // dein neues Feld (Groß-T)
+      props['token_verify_expiry'] ||   // evtl. alte Schreibweise
+      props['token_expiry'] ||          // ganz altes Feld
+      '';
+
+    if (ENFORCE_EXPIRY && expiryRaw) {
+      const exp = new Date(expiryRaw);
+      if (isFinite(exp) && exp < new Date()) {
+        return { statusCode: 410, body: 'Token expired' };
+      }
+    }
+
+    // 5) Updates vorbereiten
     const updates = [];
     const setIf = (Name, v) => { if (v !== undefined && v !== null && String(v).trim() !== '') updates.push({ Name, Value: String(v) }); };
+    const set    = (Name, v) => { updates.push({ Name, Value: String(v ?? '') }); };
 
+    // Adressfelder: nur befüllte Felder überschreiben
     setIf('firstname',  firstname);
     setIf('name',       name);
     setIf('strasse',    strasse);
@@ -106,17 +119,21 @@ exports.handler = async (event) => {
     setIf('ort',        ort);
     setIf('country',    country);
 
-    // Audit (wie bisher) + User-Agent neu
+    // Audit (IP, Timestamp, User-Agent)
     setIf('ip_verify',        ip);
-    setIf('timestamp_verify', timestamp);
-    setIf('agent_verify',     userAgent); // NEU
+    setIf('timestamp_verify', nowISO);
+    setIf('agent_verify',     userAgent);
+
+    // One-Time-Use markieren & Token/Ablauf leeren
+    set('token_verify_used_at', nowISO); // <— neue Feldbezeichnung
+    set('token_verify',  '');            // Token entfernen
+    set('Token_verify_expiry', '');      // Ablauf entfernen (neue Schreibweise)
 
     if (updates.length === 0) {
-      // Nichts zu tun -> trotzdem redirecten (kein Fehler für Nutzer)
       return { statusCode: 302, headers: { Location: 'https://verify.sikuralife.com/danke.html' }, body: '' };
     }
 
-    // 4) Mailjet-Update
+    // 6) Mailjet-Update
     const put = await fetch(`https://api.mailjet.com/v3/REST/contactdata/${encodeURIComponent(email)}`, {
       method: 'PUT',
       headers: { Authorization: mjAuth, 'Content-Type': 'application/json' },
@@ -127,7 +144,7 @@ exports.handler = async (event) => {
       return { statusCode: 502, body: `Mailjet update failed: ${t}` };
     }
 
-    // 5) Erfolg → Redirect auf Danke-Seite
+    // 7) Erfolg → Danke
     return {
       statusCode: 302,
       headers: { Location: 'https://verify.sikuralife.com/danke.html' },
