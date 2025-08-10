@@ -1,13 +1,8 @@
 // netlify/functions/send_verify_email.js
-const MJ_PUBLIC  = process.env.MJ_APIKEY_PUBLIC;
-const MJ_PRIVATE = process.env.MJ_APIKEY_PRIVATE;
-const mjAuth = 'Basic ' + Buffer.from(`${MJ_PUBLIC}:${MJ_PRIVATE}`).toString('base64');
 
-const URL_ISSUE_TOKEN    = (process.env.URL_ISSUE_TOKEN || 'https://verify.sikuralife.com/.netlify/functions/issue_token').trim();
-const MAIL_FROM_ADDRESS  = process.env.MAIL_FROM_ADDRESS || 'noreply@sikuralife.com';
-const MAIL_FROM_NAME     = process.env.MAIL_FROM_NAME    || 'SIKURA Leben AG i.L.';
+const fetch = require('node-fetch');
 
-// Template-IDs aus ENV
+// Mapping aus ENV laden
 const TPL = {
   de: {
     VN_DIREKT: process.env.TEMPLATE_DE_DIRECT,
@@ -23,139 +18,128 @@ const TPL = {
   }
 };
 
-function parseBody(e){
-  const ct=(e.headers['content-type']||'').toLowerCase();
-  if(ct.includes('application/json')){try{return JSON.parse(e.body||'{}')}catch{return{}}}
-  try{return Object.fromEntries(new URLSearchParams(e.body||'').entries())}catch{return{}}
+// Normalisierung der Sprache (kleinbuchstaben)
+function normLang(l) {
+  return String(l || '').trim().toLowerCase();
 }
 
-async function issueToken(email,id,lang='de',name=''){
-  try{ new URL(URL_ISSUE_TOKEN); }catch{ throw new Error('Bad URL_ISSUE_TOKEN: '+URL_ISSUE_TOKEN); }
-  const r = await fetch(URL_ISSUE_TOKEN,{
-    method:'POST',
-    headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({ email, id, lang, name })
-  });
-  if(!r.ok) throw new Error(`issue_token failed: ${r.status} ${await r.text()}`);
-  return r.json(); // { ok, token, expiresAt, url }
+// Normalisierung Kategorie (Leerzeichen → Unterstrich, Grossbuchstaben)
+function normCat(c) {
+  return String(c || '').trim().toUpperCase().replace(/\s+/g, '_');
 }
 
-async function getContactProps(email){
-  const r = await fetch(`https://api.mailjet.com/v3/REST/contactdata/${encodeURIComponent(email)}`,{
-    headers:{ Authorization: mjAuth }
-  });
-  if(!r.ok) return {};
-  const j = await r.json();
-  const map = Object.fromEntries((j.Data?.[0]?.Data||[]).map(p=>[p.Name, p.Value]));
-  return map; // Rohzugriff, damit wir exakt "Sprache" & "Category" lesen können
+// Sprach-Fallback: EN → DE → IT
+function languageWithFallback(requested) {
+  const l = normLang(requested);
+  const hasAny = !!(TPL?.[l]?.VN_DIREKT || TPL?.[l]?.VN_ANWALT);
+  if (hasAny) return l;
+  if (TPL?.en?.VN_DIREKT || TPL?.en?.VN_ANWALT) return 'en';
+  if (TPL?.de?.VN_DIREKT || TPL?.de?.VN_ANWALT) return 'de';
+  if (TPL?.it?.VN_DIREKT || TPL?.it?.VN_ANWALT) return 'it';
+  return l; // falls gar nix passt, das Original
 }
 
-// Normalisierer für Sprache: akzeptiert "DE"/"deutsch"/"it" etc.
-function normLang(v){
-  const s = String(v||'').trim().toLowerCase();
-  if(['de','deutsch','ger','german'].includes(s)) return 'de';
-  if(['en','eng','english'].includes(s))          return 'en';
-  if(['it','ita','italiano','italienisch'].includes(s)) return 'it';
-  return 'de'; // Fallback
-}
+// Template-ID Auswahl mit Fallback
+function pickTemplateId(lang, category, explicitTemplateId) {
+  if (explicitTemplateId) return Number(explicitTemplateId);
 
-// Normalisierer für Category: akzeptiert "VN DIREKT" / "VN ANWALT" in beliebiger Schreibweise
-function normCat(v){
-  const s = String(v||'').trim().toUpperCase().replace(/\s+/g,' ').replace(/\./g,'');
-  if(s.includes('ANWALT')) return 'VN_ANWALT';
-  return 'VN_DIREKT';
-}
+  const resolved = languageWithFallback(lang);
+  const c = category;
 
-function pickTemplateId(lang, category, explicitTemplateId){
-  if(explicitTemplateId) return Number(explicitTemplateId);
-  const id = TPL?.[lang]?.[category];
-  if(id) return Number(id);
-  // Fallback-Kaskade: erst gleiche Sprache/Direkt, dann DE/EN/IT Direkt
-  const fallbacks = [
-    TPL?.[lang]?.VN_DIREKT,
-    TPL?.de?.VN_DIREKT,
+  const candidates = [
+    TPL?.[resolved]?.[c],
+    TPL?.[resolved]?.VN_DIREKT,
+    TPL?.en?.[c],
     TPL?.en?.VN_DIREKT,
+    TPL?.de?.[c],
+    TPL?.de?.VN_DIREKT,
+    TPL?.it?.[c],
     TPL?.it?.VN_DIREKT
   ].filter(Boolean);
-  if(fallbacks.length) return Number(fallbacks[0]);
+
+  if (candidates.length) return Number(candidates[0]);
   throw new Error(`No template mapping for lang=${lang} category=${category}`);
 }
 
-exports.handler = async (event)=>{
-  try{
-    if(event.httpMethod!=='POST') return { statusCode:405, body:'Method Not Allowed' };
+exports.handler = async (event) => {
+  if (event.httpMethod !== 'POST') {
+    return { statusCode: 405, body: 'Method Not Allowed' };
+  }
 
-    const { email, id, lang, name='', templateId, category } = parseBody(event);
-    if(!email || !id) return { statusCode:400, body:'missing email or id' };
+  try {
+    const data = JSON.parse(event.body || '{}');
+    const { email, id, lang, category, name, templateId } = data;
+    if (!email || !id) {
+      return { statusCode: 400, body: 'Missing email or id' };
+    }
 
-    const emailLC = String(email).trim().toLowerCase();
+    // 1) Token generieren
+    const issueResp = await fetch(process.env.URL_ISSUE_TOKEN, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, id, lang })
+    });
 
-    // 1) Kontakt lesen (holt "Sprache", "Category", plus optionale Anzeige-Felder)
-    const props = await getContactProps(emailLC);
-    const firstname  = (props['firstname'] ?? '').toString();
-    const creditorId = (props['gläubiger'] ?? props['glaeubiger'] ?? '').toString();
-    const ort        = (props['ort'] ?? '').toString();
-    const country    = (props['country'] ?? '').toString();
+    if (!issueResp.ok) {
+      throw new Error(`Token service error: ${await issueResp.text()}`);
+    }
 
-    // Deine bestehenden Felder berücksichtigen:
-    // - Sprache: Feld heißt exakt "Sprache" und hat Werte "DE"/"IT" (ggf. auch "EN")
-    // - Category: Feld heißt exakt "Category" und hat Werte "VN DIREKT" / "VN ANWALT"
-    const langFromContact = normLang(props['Sprache']);
-    const catFromContact  = normCat(props['Category']);
+    const issueData = await issueResp.json();
+    const verifyUrl = issueData.url;
+    const expiresAt = issueData.expiresAt;
 
-    // Request-Overrides (falls im Body mitgegeben) gehen vor
-    const plang = normLang(lang ?? langFromContact);
-    const pcat  = normCat(category ?? catFromContact);
-
-    // 2) Token & URL erzeugen (7 Tage)
-    const { url, expiresAt } = await issueToken(emailLC, String(id).trim(), plang, name);
-
-    // 3) TemplateID wählen
+    // 2) Sprache/Kategorie normalisieren
+    const plang = normLang(lang);
+    const pcat = normCat(category);
     const tplId = pickTemplateId(plang, pcat, templateId);
 
-    // 4) Senden
-    const payload = {
-      Messages: [{
-        From: { Email: MAIL_FROM_ADDRESS, Name: MAIL_FROM_NAME },
-        To:   [{ Email: emailLC, Name: name }],
-        TemplateID: tplId,
-        TemplateLanguage: true,
-        TrackOpens: "enabled",
-        TrackClicks: "enabled",
-        Variables: {
-          verify_url: url,
-          expires_at: expiresAt,
-          firstname: firstname || '',
-          creditor_id: creditorId || '',
-          name: name || '',
-          ort: ort || '',
-          country: country || ''
-        },
-        TextPart:
-`Guten Tag ${firstname || ''},
+    // 3) Mailjet API Call
+    const MJ_PUBLIC = process.env.MJ_APIKEY_PUBLIC;
+    const MJ_PRIVATE = process.env.MJ_APIKEY_PRIVATE;
+    const mjAuth = 'Basic ' + Buffer.from(`${MJ_PUBLIC}:${MJ_PRIVATE}`).toString('base64');
 
-bitte bestätigen Sie Ihre Kontaktdaten:
-
-${url}
-
-Hinweis: Der Bestätigungslink ist aus Sicherheitsgründen nur 7 Tage gültig (Ablauf: ${expiresAt}).`
-      }]
-    };
-
-    const resp = await fetch('https://api.mailjet.com/v3.1/send',{
-      method:'POST',
-      headers:{ Authorization: mjAuth, 'Content-Type':'application/json' },
-      body: JSON.stringify(payload)
+    const mjResp = await fetch('https://api.mailjet.com/v3.1/send', {
+      method: 'POST',
+      headers: {
+        Authorization: mjAuth,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        Messages: [
+          {
+            From: {
+              Email: process.env.MAIL_FROM_ADDRESS,
+              Name: process.env.MAIL_FROM_NAME
+            },
+            To: [{ Email: email, Name: name || '' }],
+            TemplateID: tplId,
+            TemplateLanguage: true,
+            Variables: {
+              verify_url: verifyUrl,
+              expires_at: expiresAt
+            }
+          }
+        ]
+      })
     });
-    const text = await resp.text();
-    if(!resp.ok) return { statusCode:502, body:`Mailjet send failed: ${resp.status} ${text}` };
+
+    if (!mjResp.ok) {
+      throw new Error(`Mailjet send error: ${await mjResp.text()}`);
+    }
 
     return {
-      statusCode:200,
-      headers:{ 'Content-Type':'application/json' },
-      body: JSON.stringify({ ok:true, url, expiresAt, lang: plang, category: pcat, templateId: tplId })
+      statusCode: 200,
+      body: JSON.stringify({
+        ok: true,
+        url: verifyUrl,
+        expiresAt,
+        lang: plang,
+        category: pcat,
+        templateId: tplId
+      })
     };
-  }catch(e){
-    return { statusCode:500, body:'server error: '+e.message };
+
+  } catch (err) {
+    return { statusCode: 500, body: `Server error: ${err.message}` };
   }
 };
