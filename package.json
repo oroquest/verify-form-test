@@ -1,7 +1,5 @@
 {
   "name": "visionflow-verify",
   "version": "1.0.0",
-  "dependencies": {
-    "node-mailjet": "^3.3.1"
-  }
+  "dependencies": {}
 }
