@@ -1,116 +1,122 @@
 // netlify/functions/send_verify_email.js
+const fetch = require("node-fetch");
+const mailjet = require("node-mailjet").apiConnect(
+  process.env.MJ_APIKEY_PUBLIC,
+  process.env.MJ_APIKEY_PRIVATE
+);
 
-// Template-IDs aus ENV
-const TPL = {
-  de: { VN_DIREKT: process.env.TEMPLATE_DE_DIRECT, VN_ANWALT: process.env.TEMPLATE_DE_LAWYER },
-  en: { VN_DIREKT: process.env.TEMPLATE_EN_DIRECT, VN_ANWALT: process.env.TEMPLATE_EN_LAWYER },
-  it: { VN_DIREKT: process.env.TEMPLATE_IT_DIRECT, VN_ANWALT: process.env.TEMPLATE_IT_LAWYER }
-};
+exports.handler = async (event) => {
+  try {
+    const { email, id, lang, category, name } = JSON.parse(event.body);
 
-const URL_ISSUE_TOKEN   = (process.env.URL_ISSUE_TOKEN || 'https://verify.sikuralife.com/.netlify/functions/issue_token').trim();
-const MJ_PUBLIC         = process.env.MJ_APIKEY_PUBLIC;
-const MJ_PRIVATE        = process.env.MJ_APIKEY_PRIVATE;
-const MAIL_FROM_ADDRESS = process.env.MAIL_FROM_ADDRESS || 'noreply@sikuralife.com';
-const MAIL_FROM_NAME    = process.env.MAIL_FROM_NAME    || 'SIKURA Leben AG i.L.';
-const mjAuth            = 'Basic ' + Buffer.from(`${MJ_PUBLIC}:${MJ_PRIVATE}`).toString('base64');
+    if (!email || !id) {
+      return {
+        statusCode: 400,
+        body: JSON.stringify({ error: "Missing email or id" }),
+      };
+    }
 
-// Helpers
-function parseBody(e){
-  const ct=(e.headers['content-type']||'').toLowerCase();
-  if(ct.includes('application/json')){ try{ return JSON.parse(e.body||'{}'); }catch{ return {}; } }
-  try{ return Object.fromEntries(new URLSearchParams(e.body||'').entries()); }catch{ return {}; }
-}
-const normLang = (l)=> String(l||'').trim().toLowerCase();
-const normCat  = (c)=> String(c||'').trim().toUpperCase().replace(/\s+/g,'_'); // "VN DIREKT" -> "VN_DIREKT"
+    // 1. Kontakt abrufen
+    const contactRes = await fetch(
+      `${process.env.BASE_VERIFY_URL}/.netlify/functions/get_contact?email=${encodeURIComponent(email)}`
+    );
+    if (!contactRes.ok) {
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ error: "Failed to get contact" }),
+      };
+    }
+    const contact = await contactRes.json();
 
-function languageWithFallback(requested){
-  const l = normLang(requested);
-  const hasAny = !!(TPL?.[l]?.VN_DIREKT || TPL?.[l]?.VN_ANWALT);
-  if (hasAny) return l;
-  // bevorzugte Fallback-Reihenfolge: EN → DE → IT
-  if (TPL?.en?.VN_DIREKT || TPL?.en?.VN_ANWALT) return 'en';
-  if (TPL?.de?.VN_DIREKT || TPL?.de?.VN_ANWALT) return 'de';
-  if (TPL?.it?.VN_DIREKT || TPL?.it?.VN_ANWALT) return 'it';
-  return l;
-}
+    const firstname = contact.firstname || "";
+    const creditorId = contact.glaeubiger || "";
+    const ort = contact.ort || "";
+    const country = contact.country || "";
 
-function pickTemplateId(lang, category, explicitTemplateId){
-  if (explicitTemplateId) return Number(explicitTemplateId);
-  const resolved = languageWithFallback(lang);
-  const c = category;
-  const candidates = [
-    TPL?.[resolved]?.[c],
-    TPL?.[resolved]?.VN_DIREKT,
-    TPL?.en?.[c],
-    TPL?.en?.VN_DIREKT,
-    TPL?.de?.[c],
-    TPL?.de?.VN_DIREKT,
-    TPL?.it?.[c],
-    TPL?.it?.VN_DIREKT
-  ].filter(Boolean);
-  if (candidates.length) return Number(candidates[0]);
-  throw new Error(`No template mapping for lang=${lang} category=${category}`);
-}
+    // 2. Token erstellen
+    const tokenRes = await fetch(
+      `${process.env.URL_ISSUE_TOKEN}`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, id, lang }),
+      }
+    );
+    if (!tokenRes.ok) {
+      return {
+        statusCode: 500,
+        body: JSON.stringify({ error: "Failed to issue token" }),
+      };
+    }
+    const tokenData = await tokenRes.json();
 
-async function issueToken(email,id,lang='de',name=''){
-  try { new URL(URL_ISSUE_TOKEN); } catch { throw new Error('Bad URL_ISSUE_TOKEN: '+URL_ISSUE_TOKEN); }
-  const r = await fetch(URL_ISSUE_TOKEN,{
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ email, id, lang, name })
-  });
-  if (!r.ok) throw new Error(`issue_token failed: ${r.status} ${await r.text()}`);
-  return r.json(); // { ok, token, expiresAt, url }
-}
+    const verifyUrl = tokenData.url;
+    const expiresAt = tokenData.expiresAt;
 
-exports.handler = async (event)=>{
-  if (event.httpMethod !== 'POST') return { statusCode:405, body:'Method Not Allowed' };
-  try{
-    const { email, id, lang, category, name='', templateId } = parseBody(event);
-    if (!email || !id) return { statusCode:400, body:'Missing email or id' };
+    // 3. Template-ID abhängig von Sprache + Kategorie wählen
+    let templateId;
+    const langKey = (lang || contact.Sprache || "en").toLowerCase();
+    const catKey = (category || contact.Category || "").toUpperCase();
 
-    // 1) Token & URL
-    const { url, expiresAt } = await issueToken(String(email).trim().toLowerCase(), String(id).trim(), normLang(lang), name);
+    if (langKey === "de") {
+      templateId =
+        catKey === "VN ANWALT"
+          ? parseInt(process.env.TEMPLATE_DE_LAWYER)
+          : parseInt(process.env.TEMPLATE_DE_DIRECT);
+    } else {
+      // Fallback EN
+      templateId =
+        catKey === "VN ANWALT"
+          ? parseInt(process.env.TEMPLATE_EN_LAWYER)
+          : parseInt(process.env.TEMPLATE_EN_DIRECT);
+    }
 
-    // 2) Sprache/Kategorie normalisieren + Template wählen
-    const plang = normLang(lang);
-    const pcat  = normCat(category);
-    const tplId = pickTemplateId(plang, pcat, templateId);
+    // 4. Mail versenden
+    const sendRes = await mailjet
+      .post("send", { version: "v3.1" })
+      .request({
+        Messages: [
+          {
+            From: {
+              Email: process.env.MAIL_FROM_ADDRESS,
+              Name: process.env.MAIL_FROM_NAME,
+            },
+            To: [{ Email: email, Name: name || firstname }],
+            TemplateID: templateId,
+            TemplateLanguage: true, // 🔹 WICHTIG für {{var:...}}
+            Variables: {
+              verify_url: verifyUrl,
+              expires_at: expiresAt,
+              firstname: firstname,
+              creditor_id: creditorId,
+              name: name || "",
+              ort: ort,
+              country: country,
+            },
+          },
+        ],
+      });
 
-    // 3) Mailjet Send
-    const payload = {
-      Messages: [{
-        From: { Email: MAIL_FROM_ADDRESS, Name: MAIL_FROM_NAME },
-        To:   [{ Email: String(email).trim().toLowerCase(), Name: name }],
-        TemplateID: tplId,
-        TemplateLanguage: true,
-        TrackOpens: "enabled",
-        TrackClicks: "enabled",
-        Variables: { verify_url: url, expires_at: expiresAt },
-        TextPart:
-`Guten Tag,
-
-bitte bestätigen Sie Ihre Kontaktdaten:
-
-${url}
-
-Hinweis: Der Bestätigungslink ist aus Sicherheitsgründen nur 7 Tage gültig (Ablauf: ${expiresAt}).`
-      }]
-    };
-
-    const resp = await fetch('https://api.mailjet.com/v3.1/send',{
-      method:'POST',
-      headers:{ Authorization: mjAuth, 'Content-Type':'application/json' },
-      body: JSON.stringify(payload)
-    });
-    const text = await resp.text();
-    if (!resp.ok) return { statusCode:502, body:`Mailjet send failed: ${resp.status} ${text}` };
+    if (sendRes.body.Messages[0].Status !== "success") {
+      throw new Error("Mailjet send failed");
+    }
 
     return {
-      statusCode:200,
-      headers:{ 'Content-Type':'application/json' },
-      body: JSON.stringify({ ok:true, url, expiresAt, lang: plang, category: pcat, templateId: tplId })
+      statusCode: 200,
+      body: JSON.stringify({
+        ok: true,
+        url: verifyUrl,
+        expiresAt,
+        lang: langKey,
+        category: catKey,
+        templateId,
+      }),
     };
-  }catch(e){
-    return { statusCode:500, body:'Server error: '+e.message };
+  } catch (err) {
+    console.error("Send verify email error:", err);
+    return {
+      statusCode: 500,
+      body: JSON.stringify({ error: err.message || "Server error" }),
+    };
   }
 };
