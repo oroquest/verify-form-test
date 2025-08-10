@@ -1,8 +1,5 @@
 // netlify/functions/send_verify_email.js
-const mailjet = require("node-mailjet").apiConnect(
-  process.env.MJ_APIKEY_PUBLIC,
-  process.env.MJ_APIKEY_PRIVATE
-);
+// Senden ohne node-mailjet SDK – direkte v3.1 REST API per fetch
 
 exports.handler = async (event) => {
   try {
@@ -10,14 +7,32 @@ exports.handler = async (event) => {
       return { statusCode: 405, body: "Method Not Allowed" };
     }
 
+    const env = (k) => {
+      const v = process.env[k];
+      if (!v) throw new Error(`Missing ENV ${k}`);
+      return v;
+    };
+
+    // --- ENV prüfen ---
+    const MJ_PUBLIC  = env("MJ_APIKEY_PUBLIC");
+    const MJ_PRIVATE = env("MJ_APIKEY_PRIVATE");
+    const MAIL_FROM_ADDRESS = env("MAIL_FROM_ADDRESS");
+    const MAIL_FROM_NAME    = env("MAIL_FROM_NAME");
+    const BASE_VERIFY_URL   = env("BASE_VERIFY_URL");      // z.B. https://verify.sikuralife.com
+    const URL_ISSUE_TOKEN   = env("URL_ISSUE_TOKEN");      // z.B. https://verify.sikuralife.com/.netlify/functions/issue_token
+    const TPL_DE_DIRECT     = Number(env("TEMPLATE_DE_DIRECT"));
+    const TPL_DE_LAWYER     = Number(env("TEMPLATE_DE_LAWYER"));
+    const TPL_EN_DIRECT     = Number(env("TEMPLATE_EN_DIRECT"));
+    const TPL_EN_LAWYER     = Number(env("TEMPLATE_EN_LAWYER"));
+
     const { email, id, lang, category, name } = JSON.parse(event.body || "{}");
     if (!email || !id) {
       return { statusCode: 400, body: JSON.stringify({ error: "Missing email or id" }) };
     }
 
-    // 1) Kontakt holen
+    // --- 1) Kontakt holen ---
     const contactRes = await fetch(
-      `${process.env.BASE_VERIFY_URL}/.netlify/functions/get_contact?email=${encodeURIComponent(email)}`
+      `${BASE_VERIFY_URL}/.netlify/functions/get_contact?email=${encodeURIComponent(email)}`
     );
     if (!contactRes.ok) {
       const t = await contactRes.text();
@@ -28,11 +43,13 @@ exports.handler = async (event) => {
     const creditorId = contact.glaeubiger || contact["gläubiger"] || "";
     const ort        = contact.ort || "";
     const country    = contact.country || "";
-    const prefLang   = (lang || contact.Sprache || "en").toLowerCase();
-    const prefCat    = (category || contact.Category || "").toUpperCase();
 
-    // 2) Token ausstellen
-    const tokenRes = await fetch(process.env.URL_ISSUE_TOKEN, {
+    // Sprache/Kategorie bestimmen (mit Fallbacks)
+    const prefLang = (lang || contact.Sprache || "en").toLowerCase();
+    const prefCat  = (category || contact.Category || "").toUpperCase();
+
+    // --- 2) Token ausstellen ---
+    const tokenRes = await fetch(URL_ISSUE_TOKEN, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email, id, lang: prefLang })
@@ -45,27 +62,31 @@ exports.handler = async (event) => {
     const verifyUrl = tokenData.url;
     const expiresAt = tokenData.expiresAt;
 
-    // 3) Template-ID wahlen (DE/EN × DIREKT/ANWALT)
+    // --- 3) Template-ID wählen ---
     let templateId;
     if (prefLang === "de") {
-      templateId = prefCat === "VN ANWALT"
-        ? Number(process.env.TEMPLATE_DE_LAWYER)
-        : Number(process.env.TEMPLATE_DE_DIRECT);
+      templateId = (prefCat === "VN ANWALT") ? TPL_DE_LAWYER : TPL_DE_DIRECT;
     } else {
-      // Fallback EN (auch für IT)
-      templateId = prefCat === "VN ANWALT"
-        ? Number(process.env.TEMPLATE_EN_LAWYER)
-        : Number(process.env.TEMPLATE_EN_DIRECT);
+      // Fallback EN (auch für it)
+      templateId = (prefCat === "VN ANWALT") ? TPL_EN_LAWYER : TPL_EN_DIRECT;
+    }
+    if (!Number.isFinite(templateId)) {
+      return { statusCode: 500, body: JSON.stringify({ error: "Invalid TemplateID (ENV not set?)" }) };
     }
 
-    // 4) Senden mit TemplateLanguage: true + Variablen
-    const sendResp = await mailjet.post("send", { version: "v3.1" }).request({
+    // --- 4) Mailjet v3.1 Send-Call per fetch ---
+    const mjAuth = 'Basic ' + Buffer.from(`${MJ_PUBLIC}:${MJ_PRIVATE}`).toString('base64');
+    const subject = (prefLang === "de")
+      ? "Verifizierung Ihrer Daten"
+      : "Verify your contact details";
+
+    const payload = {
       Messages: [{
-        From: { Email: process.env.MAIL_FROM_ADDRESS, Name: process.env.MAIL_FROM_NAME },
+        From: { Email: MAIL_FROM_ADDRESS, Name: MAIL_FROM_NAME },
         To:   [{ Email: email, Name: name || firstname }],
         TemplateID: templateId,
-        TemplateLanguage: true, // << wichtig
-        Subject: prefLang === "de" ? "Verifizierung Ihrer Daten" : "Verify your contact details",
+        TemplateLanguage: true, // << wichtig für {{var:...}}
+        Subject: subject,
         Variables: {
           verify_url:  verifyUrl,
           expires_at:  expiresAt,
@@ -76,13 +97,27 @@ exports.handler = async (event) => {
           country:     country
         }
       }]
+    };
+
+    const sendRes = await fetch("https://api.mailjet.com/v3.1/send", {
+      method: "POST",
+      headers: {
+        "Authorization": mjAuth,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
     });
 
-    const status = sendResp?.body?.Messages?.[0]?.Status;
+    const sendBody = await sendRes.json().catch(() => ({}));
+    if (!sendRes.ok) {
+      return { statusCode: 502, body: JSON.stringify({ error: "Mailjet send failed", details: sendBody }) };
+    }
+    const status = sendBody?.Messages?.[0]?.Status;
     if (status !== "success") {
-      return { statusCode: 502, body: JSON.stringify({ error: "Mailjet send failed", status }) };
+      return { statusCode: 502, body: JSON.stringify({ error: "Mailjet send failed", status, details: sendBody }) };
     }
 
+    // --- Erfolg ---
     return {
       statusCode: 200,
       body: JSON.stringify({
@@ -94,8 +129,8 @@ exports.handler = async (event) => {
         templateId
       })
     };
+
   } catch (err) {
-    console.error("Send verify email error:", err);
-    return { statusCode: 500, body: JSON.stringify({ error: err.message || "Server error" }) };
+    return { statusCode: 500, body: JSON.stringify({ errorType: err.name, errorMessage: err.message }) };
   }
 };
