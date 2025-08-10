@@ -1,9 +1,3 @@
-// Production guard: disable this test function in production
-if (process.env.NODE_ENV === 'production') {
-  exports.handler = async () => ({ statusCode: 404, body: 'Not Found' });
-  return;
-}
-
 
 exports.handler = async (event, context) => {
   const query = event.queryStringParameters;

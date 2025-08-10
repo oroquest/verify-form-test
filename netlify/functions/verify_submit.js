@@ -1,13 +1,4 @@
 // netlify/functions/verify_submit.js
-// Simple in-memory rate limiter (best-effort for serverless)
-const __hits = new Map();
-function rateLimit(key, limit = 5, windowMs = 60_000) {
-  const now = Date.now();
-  const arr = (__hits.get(key) || []).filter(ts => now - ts < windowMs);
-  arr.push(now);
-  __hits.set(key, arr);
-  return arr.length <= limit;
-}
 const MJ_PUBLIC  = process.env.MJ_APIKEY_PUBLIC;
 const MJ_PRIVATE = process.env.MJ_APIKEY_PRIVATE;
 const mjAuth = 'Basic ' + Buffer.from(`${MJ_PUBLIC}:${MJ_PRIVATE}`).toString('base64');
@@ -46,8 +37,6 @@ function sanitizeUA(ua) {
 }
 
 exports.handler = async (event) => {
-  const ip = (event.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown';
-  if (!rateLimit(ip)) { return { statusCode: 429, body: 'Too Many Requests' }; }
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' };
   }

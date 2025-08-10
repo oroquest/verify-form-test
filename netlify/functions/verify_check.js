@@ -1,22 +1,9 @@
 const MJ_PUBLIC = process.env.MJ_APIKEY_PUBLIC;
-// Normalize expiry field name across variants and enforce expiry in production
-function normalizeExpiry(props) {
-  const keyCandidates = [
-    'Token_verify_expiry',
-    'token_verify_expiry',
-    'token_expiry',
-    'Token_expiry'
-  ];
-  for (const k of keyCandidates) {
-    if (props && props[k]) return props[k];
-  }
-  return '';
-}
 const MJ_PRIVATE = process.env.MJ_APIKEY_PRIVATE;
 const mjAuth = 'Basic ' + Buffer.from(`${MJ_PUBLIC}:${MJ_PRIVATE}`).toString('base64');
 
 // Testmodus-Schalter: true = abgelaufene Tokens werden NICHT blockiert (nur Hinweis)
-const TEST_MODE = false;
+const TEST_MODE = true;
 
 const messages = {
   success: {
