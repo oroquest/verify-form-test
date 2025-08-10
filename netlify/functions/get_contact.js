@@ -5,7 +5,7 @@ const mjAuth = 'Basic ' + Buffer.from(`${MJ_PUBLIC}:${MJ_PRIVATE}`).toString('ba
 
 function cors() {
   return {
-    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Origin': origin,
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type, Authorization'
   };
@@ -46,9 +46,7 @@ exports.handler = async (event) => {
       country:    props['country']    ?? ''
     };
 
-    return {
-      statusCode: 200,
-      headers: { ...cors(), 'Content-Type': 'application/json' },
+    return { statusCode: 200, headers: { ...cors(origin),  ...cors(), 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
     };
   } catch (e) {

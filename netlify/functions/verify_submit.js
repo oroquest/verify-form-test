@@ -1,4 +1,13 @@
 // netlify/functions/verify_submit.js
+// Simple in-memory rate limiter (best-effort for serverless)
+const __hits = new Map();
+function rateLimit(key, limit = 5, windowMs = 60_000) {
+  const now = Date.now();
+  const arr = (__hits.get(key) || []).filter(ts => now - ts < windowMs);
+  arr.push(now);
+  __hits.set(key, arr);
+  return arr.length <= limit;
+}
 const MJ_PUBLIC  = process.env.MJ_APIKEY_PUBLIC;
 const MJ_PRIVATE = process.env.MJ_APIKEY_PRIVATE;
 const mjAuth = 'Basic ' + Buffer.from(`${MJ_PUBLIC}:${MJ_PRIVATE}`).toString('base64');
@@ -37,6 +46,8 @@ function sanitizeUA(ua) {
 }
 
 exports.handler = async (event) => {
+  const ip = (event.headers['x-forwarded-for'] || '').split(',')[0].trim() || 'unknown';
+  if (!rateLimit(ip)) { return { statusCode: 429, body: 'Too Many Requests' }; }
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' };
   }
@@ -44,9 +55,7 @@ exports.handler = async (event) => {
   const data = parseFormBody(event);
   let { id, token, em, email, lang, firstname, name, strasse, hausnummer, plz, ort, country, land } = data;
 
-  // E-Mail aus em rekonstruieren, wenn nötig
   if (!email && em) email = b64urlDecode(em).trim();
-  // country vs. land berücksichtigen
   if (!country && land) country = land;
 
   if (!id || !token || !email) {
@@ -72,11 +81,11 @@ exports.handler = async (event) => {
     }
     const json = await r.json();
     const propsArray = json.Data?.[0]?.Data || [];
-    const props = Object.fromEntries(propsArray.map(p => [p.Name, p.Value]));
+    const theProps = Object.fromEntries(propsArray.map(p => [p.Name, p.Value]));
 
     // 2) Pflicht-Validierungen
-    const glaeubigerVal = (props['gläubiger'] ?? props['glaeubiger'] ?? '').toString().trim();
-    const tokenVerify   = (props['token_verify'] || '').toString().trim();
+    const glaeubigerVal = (theProps['gläubiger'] ?? theProps['glaeubiger'] ?? '').toString().trim();
+    const tokenVerify   = (theProps['token_verify'] || '').toString().trim();
 
     if (glaeubigerVal !== String(id).trim()) {
       return { statusCode: 403, body: 'ID mismatch' };
@@ -85,19 +94,18 @@ exports.handler = async (event) => {
       return { statusCode: 403, body: 'Invalid token' };
     }
 
-    // 3) One-Time-Use prüfen (NEU: token_verify_used_at)
-    const tokenUsedAt = (props['token_verify_used_at'] || '').toString().trim();
+    // 3) One-Time-Use pruefen (token_verify_used_at)
+    const tokenUsedAt = (theProps['token_verify_used_at'] || '').toString().trim();
     if (ENFORCE_SINGLE_USE && tokenUsedAt) {
       return { statusCode: 409, body: 'Token already used' };
     }
 
-    // 4) Ablauf prüfen (primär "Token_verify_expiry", sonst Fallbacks)
+    // 4) Ablauf pruefen (Token_verify_expiry bevorzugt, Fallbacks moeglich)
     const expiryRaw =
-      props['Token_verify_expiry'] ||   // dein neues Feld (Groß-T)
-      props['token_verify_expiry'] ||   // evtl. alte Schreibweise
-      props['token_expiry'] ||          // ganz altes Feld
+      theProps['Token_verify_expiry'] ||
+      theProps['token_verify_expiry'] ||
+      theProps['token_expiry'] ||
       '';
-
     if (ENFORCE_EXPIRY && expiryRaw) {
       const exp = new Date(expiryRaw);
       if (isFinite(exp) && exp < new Date()) {
@@ -110,7 +118,7 @@ exports.handler = async (event) => {
     const setIf = (Name, v) => { if (v !== undefined && v !== null && String(v).trim() !== '') updates.push({ Name, Value: String(v) }); };
     const set    = (Name, v) => { updates.push({ Name, Value: String(v ?? '') }); };
 
-    // Adressfelder: nur befüllte Felder überschreiben
+    // Adressfelder: nur befuellte Felder ueberschreiben
     setIf('firstname',  firstname);
     setIf('name',       name);
     setIf('strasse',    strasse);
@@ -125,13 +133,9 @@ exports.handler = async (event) => {
     setIf('agent_verify',     userAgent);
 
     // One-Time-Use markieren & Token/Ablauf leeren
-    set('token_verify_used_at', nowISO); // <— neue Feldbezeichnung
-    set('token_verify',  '');            // Token entfernen
-    set('Token_verify_expiry', '');      // Ablauf entfernen (neue Schreibweise)
-
-    if (updates.length === 0) {
-      return { statusCode: 302, headers: { Location: 'https://verify.sikuralife.com/danke.html' }, body: '' };
-    }
+    set('token_verify_used_at', nowISO);
+    set('token_verify',  '');
+    set('Token_verify_expiry', '');
 
     // 6) Mailjet-Update
     const put = await fetch(`https://api.mailjet.com/v3/REST/contactdata/${encodeURIComponent(email)}`, {
@@ -144,7 +148,16 @@ exports.handler = async (event) => {
       return { statusCode: 502, body: `Mailjet update failed: ${t}` };
     }
 
-    // 7) Erfolg → Danke
+    // 7) Erfolg → je nach Clienttyp JSON oder Redirect
+    const isAjax = /json/i.test(event.headers['accept'] || '') ||
+                   (event.headers['x-requested-with'] || '').toLowerCase() === 'fetch';
+    if (isAjax) {
+      return {
+        statusCode: 200,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ok: true, redirect: 'https://verify.sikuralife.com/danke.html' })
+      };
+    }
     return {
       statusCode: 302,
       headers: { Location: 'https://verify.sikuralife.com/danke.html' },
