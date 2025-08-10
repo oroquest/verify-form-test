@@ -1,13 +1,3 @@
 [functions]
   node_bundler = "esbuild"
   directory = "netlify/functions"
-
-[[headers]]
-  for = "/*"
-  [headers.values]
-  Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
-  Content-Security-Policy = "default-src 'self'; img-src 'self' data:; script-src 'self'; style-src 'self' 'unsafe-inline'; connect-src 'self' https://api.mailjet.com https://verify.sikuralife.com; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
-  X-Content-Type-Options = "nosniff"
-  X-Frame-Options = "DENY"
-  Referrer-Policy = "no-referrer"
-  Permissions-Policy = "geolocation=(), microphone=(), camera=()"
