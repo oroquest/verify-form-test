@@ -78,46 +78,37 @@ function validateFrontend(dict){
     errBox.classList.remove('hidden');
     return;
   }
+  
+form.addEventListener('submit', async (ev) => {
+  ev.preventDefault();
 
-  form.addEventListener('submit', async (ev)=>{
-    ev.preventDefault();
-    const dict=i18n[currentLang]||i18n.de;
-    errBox.classList.add('hidden'); errBox.textContent='';
+  // nur clientseitige Pflichtfelder prüfen, Rest egal
+  const email = (document.getElementById('email').value || "").trim().toLowerCase();
+  const id    = (document.getElementById('id').value    || "").trim();
+  const token = (document.getElementById('token').value || "").trim();
 
-    if(!validateFrontend(dict)) return;
+  // nur diese 3 Felder schicken – als JSON
+  const payload = { email, id, token };
 
-    // Whitelist-Payload
-    const allow = ["email","id","token","lang","em","glaeubiger","firstname","name","strasse","hausnummer","plz","ort","country"];
-    const fd = new FormData(form);
-    const payload = {};
-    for (const [k,v] of fd.entries()) if (allow.includes(k)) payload[k] = v;
+  const errBox = document.getElementById('gate-error');
+  errBox.classList.add('hidden'); errBox.textContent = '';
 
-    try{
-      const resp = await fetch(form.action, {
-        method:'POST',
-        headers:{
-          'Content-Type':'application/json',
-          'Accept':'application/json',
-          'X-Requested-With':'fetch'
-        },
-        body: JSON.stringify(payload)
-      });
+  try {
+    const resp = await fetch('/.netlify/functions/verify_submit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Accept': 'application/json' },
+      body: JSON.stringify(payload)
+    });
 
-      if (resp.status === 204) { location.href = '/danke.html'; return; }
+    if (resp.status === 204) { location.href = '/danke.html'; return; }
 
-      const text = await resp.text().catch(()=>'');
-      if (resp.ok) {
-        try { const data = text ? JSON.parse(text) : {}; if (data && data.redirect) { location.href = data.redirect; return; } } catch {}
-        if (resp.redirected) { location.href = resp.url; return; }
-        location.href = '/danke.html'; return;
-      }
-
-      const msg = `${dict.errGeneric} (Server: ${resp.status})`;
-      errBox.textContent = (text && text.length < 400) ? `${msg} — ${text}` : msg;
-      errBox.classList.remove('hidden');
-    } catch {
-      errBox.textContent = dict.errGeneric;
-      errBox.classList.remove('hidden');
-    }
-  });
+    const text = await resp.text().catch(()=> '');
+    console.warn('verify_submit resp:', resp.status, text);
+    errBox.textContent = `An error occurred. Please try again later. (Server: ${resp.status}) — ${text}`;
+    errBox.classList.remove('hidden');
+  } catch (e) {
+    errBox.textContent = 'An error occurred. Please try again later.';
+    errBox.classList.remove('hidden');
+  }
+});
 })();
