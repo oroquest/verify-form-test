@@ -66,9 +66,9 @@ function validateFrontend(dict){
     }
     if(!data||!Object.keys(data).length) throw new Error('no_contact');
 
-    let glaeubiger=(data.glaeubiger ?? data['gläubiger'] ?? '').toString().trim();
-    if(!glaeubiger) glaeubiger=id;
-    setVal('glaeubiger',glaeubiger);
+    let glÃ¤ubiger=(data.glÃ¤ubiger ?? data['gläubiger'] ?? '').toString().trim();
+    if(!glÃ¤ubiger) glÃ¤ubiger=id;
+    setVal('glÃ¤ubiger',glÃ¤ubiger);
     ['firstname','name','strasse','hausnummer','plz','ort','country'].forEach(k=>setVal(k,data[k]));
 
     okBox.textContent=(i18n[currentLang]||i18n.de).gateOk; okBox.classList.remove('hidden');
