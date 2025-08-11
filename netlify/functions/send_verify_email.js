@@ -1,88 +1,94 @@
 // netlify/functions/send_verify_email.js
 exports.handler = async (event) => {
   try {
+    if (event.httpMethod === 'OPTIONS') {
+      return cors(200, '');
+    }
     if (event.httpMethod !== 'POST') {
-      return { statusCode: 405, body: '' };
+      return cors(405, '');
     }
 
     const { email, id, lang, category, token } = JSON.parse(event.body || '{}');
 
-    // 1) Eingaben prüfen
-    if (!email || !id || !token) {
-      return resp(400, { error: 'missing_params' });
-    }
-    const tokenOk = /^[0-9a-f]{64}$/.test(String(token)); // exakt 64-hex (32 Bytes)
-    if (!tokenOk) {
-      return resp(400, { error: 'invalid_token_format' });
+    // Eingaben prüfen
+    if (!email || !id || !token) return cors(400, { error: 'missing_params' });
+    if (!/^[0-9a-f]{64}$/.test(String(token))) {
+      return cors(400, { error: 'invalid_token_format' });
     }
 
-    // 2) Template pro Kategorie wählen (DE/EN/IT je nach Wunsch)
+    // Template pro Kategorie/Sprache
     const tplMap = {
-      // Beispiel: passe IDs an deine Mailjet-Template-IDs an
-      direct:   { de: process.env.TEMPLATE_DE_DIRECT,   en: process.env.TEMPLATE_EN_DIRECT,   it: process.env.TEMPLATE_EN_DIRECT },
-      lawyer:   { de: process.env.TEMPLATE_DE_LAWYER,   en: process.env.TEMPLATE_EN_LAWYER,   it: process.env.TEMPLATE_EN_LAWYER },
-      fallback: { de: process.env.TEMPLATE_DE_DIRECT,   en: process.env.TEMPLATE_EN_DIRECT,   it: process.env.TEMPLATE_EN_LAWYER },
+      direct:   { de: process.env.TEMPLATE_DE_DIRECT, en: process.env.TEMPLATE_EN_DIRECT, it: process.env.TEMPLATE_IT_DIRECT },
+      lawyer:   { de: process.env.TEMPLATE_DE_LAWYER, en: process.env.TEMPLATE_EN_LAWYER, it: process.env.TEMPLATE_IT_LAWYER },
+      fallback: { de: process.env.TEMPLATE_DE_DIRECT, en: process.env.TEMPLATE_EN_DIRECT, it: process.env.TEMPLATE_IT_DIRECT },
     };
-    const l = (lang || 'de').toLowerCase();
-    const cat = (category || 'fallback').toLowerCase();
-    const tplByLang = tplMap[cat] || tplMap.fallback;
-    const templateId = tplByLang[l] || tplByLang.de;
+    const L = (lang || 'de').toLowerCase();
+    const CAT = (category || 'fallback').toLowerCase();
+    const tplByLang = tplMap[CAT] || tplMap.fallback;
+    const templateId = Number(tplByLang[L] || tplByLang.de);
+    if (!templateId) return cors(500, { error: 'template_not_configured', CAT, L });
 
-    if (!templateId) {
-      return resp(500, { error: 'template_not_configured', cat, lang: l });
-    }
-
-    // 3) Link NUR aus dem übergebenen Token bauen (kein Neuerzeugen!)
     const base = process.env.BASE_VERIFY_URL || 'https://verify.sikuralife.com';
-    const emB64url = toB64Url(email.trim().toLowerCase());
-    const verifyUrl = `${base}/?lang=${encodeURIComponent(l)}&id=${encodeURIComponent(id)}&token=${token}&em=${emB64url}`;
+    const emB64 = toB64Url(String(email).trim().toLowerCase());
+    const verifyUrl = `${base}/?lang=${encodeURIComponent(L)}&id=${encodeURIComponent(id)}&token=${token}&em=${emB64}`;
 
-    // 4) Mailjet aufrufen
-    const mj = require('node-mailjet').apiConnect(
-      process.env.MJ_APIKEY_PUBLIC,
-      process.env.MJ_APIKEY_PRIVATE
-    );
+    // Mailjet v3.1 /send via fetch (Basic Auth PUBLIC:PRIVATE)
+    const mjPub = process.env.MJ_APIKEY_PUBLIC;
+    const mjPrv = process.env.MJ_APIKEY_PRIVATE;
+    if (!mjPub || !mjPrv) return cors(500, { error: 'mailjet_keys_missing' });
 
-    // Gläubiger-Nr in der Mail anzeigen: als Variable mitschicken
-    const vars = {
-      url: verifyUrl,
-      id,
-      email: email,
-      token: token,
-    };
-
-    const request = await mj.post('send', { version: 'v3.1' }).request({
+    const auth = Buffer.from(`${mjPub}:${mjPrv}`).toString('base64');
+    const body = {
       Messages: [{
         From: { Email: process.env.MAIL_FROM_ADDRESS, Name: process.env.MAIL_FROM_NAME },
         To:   [{ Email: email }],
-        TemplateID: Number(templateId),
+        TemplateID: templateId,
         TemplateLanguage: true,
-        Variables: vars
+        Variables: {
+          url: verifyUrl,
+          id,
+          email,
+          token
+        }
       }]
+    };
+
+    const r = await fetch('https://api.mailjet.com/v3.1/send', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${auth}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
     });
 
-    return resp(200, { templateId, url: verifyUrl });
+    const text = await r.text();
+    if (!r.ok) {
+      return cors(502, { error: 'mailjet_error', status: r.status, body: safeCut(text) });
+    }
+
+    return cors(200, { templateId, url: verifyUrl });
   } catch (e) {
-    return resp(500, { error: 'crash', message: String(e && e.message || e) });
+    return cors(500, { error: 'crash', message: String(e && e.message || e) });
   }
 };
 
 // Helpers
-function resp(statusCode, body) {
+function cors(statusCode, body) {
   return {
     statusCode,
     headers: {
-      'Content-Type': 'application/json',
+      'Content-Type': typeof body === 'string' ? 'text/plain; charset=utf-8' : 'application/json',
       'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || 'https://verify.sikuralife.com',
       'Access-Control-Allow-Methods': 'POST, OPTIONS, GET',
-      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
       'Access-Control-Max-Age': '86400',
       'Strict-Transport-Security': 'max-age=31536000'
     },
-    body: JSON.stringify(body)
+    body: typeof body === 'string' ? body : JSON.stringify(body)
   };
 }
 function toB64Url(str) {
-  const b64 = Buffer.from(str, 'utf8').toString('base64');
-  return b64.replace(/=+$/,'').replace(/\+/g,'-').replace(/\//g,'_');
+  return Buffer.from(str, 'utf8').toString('base64').replace(/=+$/,'').replace(/\+/g,'-').replace(/\//g,'_');
 }
+function safeCut(s) { return (s || '').slice(0, 500); }
