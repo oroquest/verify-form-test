@@ -1,3 +1,13 @@
+
+// --- Security Patch Start ---
+function isValidEmail(email) {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && email.length <= 254;
+}
+function isValidToken(token) {
+  return /^[A-Za-z0-9-_]{20,}$/.test(token);
+}
+// --- Security Patch End ---
+
 // netlify/functions/verify_submit.js
 const MJ_PUBLIC  = process.env.MJ_APIKEY_PUBLIC;
 const MJ_PRIVATE = process.env.MJ_APIKEY_PRIVATE;
