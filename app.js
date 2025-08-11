@@ -1,9 +1,9 @@
-/* Sikura verify app.js – extern ausgelagert (CSP: script-src 'self') */
+/* Sikura verify app.js – robust fetch/parse + shape unwrap + on-page debug */
 
 const i18n = {
   de: { title:"Bitte bestätigen Sie Ihre Adresse", intro:"Felder sind vorbefüllt und können bei Bedarf aktualisiert werden.", ctx:"Bitte geben Sie Ihre vollständigen und korrekten Adressdaten ein.", glaeubiger:"Gläubiger‑Nr.", firstname:"Vorname", name:"Nachname", strasse:"Strasse", hausnummer:"Nr.", plz:"PLZ", ort:"Ort", country:"Land", hintGlaeubiger:"Nummer des Gläubigers.", hintFirst:"Vorname gemäss Personalausweis.", hintName:"Nachname gemäss Personalausweis.", hintStrasse:"Strassenname gemäss offizieller Adresse ohne Hausnummer.", hintHausnummer:"Hausnummer gemäss offizieller Adresse.", hintZIP:"Postleitzahl gemäss Land (CH/LI = 4 Ziffern, DE/IT = 5 Ziffern).", hintOrt:"Ort gemäss offizieller Adresse.", hintCountry:"Land gemäss offizieller Adresse.", confirm:"Ich bestätige, dass die angegebenen Daten korrekt sind.", privacy:"Ich stimme der Verarbeitung meiner Daten gemäss DSGVO zu.", privacyLink:"Datenschutzhinweise", submit:"Absenden", errRequired:"Pflichtfeld – bitte ausfüllen.", errDigits:"Es sind nur Ziffern erlaubt.", errConfirm:"Bitte bestätigen Sie die Richtigkeit der Angaben.", errPrivacy:"Bitte stimmen Sie der DSGVO‑Verarbeitung zu.", errZIPLenCH:"PLZ muss 4 Ziffern haben (CH).", errZIPLenLI:"PLZ muss 4 Ziffern haben (LI).", errZIPLenIT:"PLZ muss 5 Ziffern haben (IT).", errZIPLenDE:"PLZ muss 5 Ziffern haben (DE).", expiry:"Hinweis: Der Bestätigungslink ist aus Sicherheitsgründen 7 Tage gültig.", gateFail:"Verifizierung fehlgeschlagen. Der Link ist ungültig oder abgelaufen.", gateOk:"Link geprüft – Formular freigeschaltet.", errInvalidToken:"Link ungültig oder bereits verwendet.", errTokenExpired:"Link abgelaufen.", errTokenUsed:"Link bereits verwendet.", errGeneric:"Es ist ein Fehler aufgetreten. Bitte versuchen Sie es später erneut." },
   it: { title:"Per favore conferma il tuo indirizzo", intro:"I campi sono precompilati e possono essere aggiornati se necessario.", ctx:"Si prega di inserire i dati completi e corretti dell'indirizzo.", glaeubiger:"Numero del creditore", firstname:"Nome", name:"Cognome", strasse:"Via", hausnummer:"Nr.", plz:"CAP", ort:"Città", country:"Paese", hintGlaeubiger:"Numero del creditore come da comunicazione.", hintFirst:"Nome secondo la carta d'identità.", hintName:"Cognome secondo la carta d'identità.", hintStrasse:"Nome della via senza numero civico.", hintHausnummer:"Numero civico secondo l'indirizzo ufficiale.", hintZIP:"CAP secondo il paese (CH/LI = 4 cifre, DE/IT = 5 cifre).", hintOrt:"Località secondo l'indirizzo ufficiale.", hintCountry:"Paese secondo l'indirizzo ufficiale.", confirm:"Confermo che i dati forniti sono corretti.", privacy:"Acconsento al trattamento dei miei dati secondo il GDPR.", privacyLink:"Informativa privacy", submit:"Invia", errRequired:"Campo obbligatorio – compila per favore.", errDigits:"Sono consentite solo cifre.", errConfirm:"Conferma che i dati sono corretti.", errPrivacy:"Fornisci il consenso GDPR.", errZIPLenCH:"Il CAP deve avere 4 cifre (CH).", errZIPLenLI:"Il CAP deve avere 4 cifre (LI).", errZIPLenIT:"Il CAP deve avere 5 cifre (IT).", errZIPLenDE:"Il CAP deve avere 5 cifre (DE).", expiry:"Nota: Per motivi di sicurezza il link è valido per 7 giorni.", gateFail:"Verifica non riuscita. Il link non è valido o è scaduto.", gateOk:"Link verificato – modulo abilitato.", errInvalidToken:"Link non valido o già utilizzato.", errTokenExpired:"Link scaduto.", errTokenUsed:"Link già utilizzato.", errGeneric:"Si è verificato un errore. Riprova più tardi." },
-  en: { title:"Please confirm your address", intro:"Fields are pre-filled and can be updated if needed.", ctx:"Please enter your complete and correct address details.", glaeubiger:"Creditor No.", firstname:"First name", name:"Last name", strasse:"Street", hausnummer:"No.", plz:"ZIP", ort:"City/Town", country:"Country", hintGlaeubiger:"Creditor number as stated in the letter.", hintFirst:"First name according to identity card.", hintName:"Last name according to identity card.", hintStrasse:"Street name without house number.", hintHausnummer:"House number as per official address.", hintZIP:"ZIP code according to country (CH/LI = 4 digits, DE/IT = 5 digits).", hintOrt:"City/Town as per official address.", hintCountry:"Country as per official address.", confirm:"I confirm that the information provided is correct.", privacy:"I consent to the processing of my data under GDPR.", privacyLink:"Privacy notice", submit:"Submit", errRequired:"Required field — please fill in.", errDigits:"Digits only.", errConfirm:"Please confirm the information is correct.", errPrivacy:"Please provide GDPR consent.", errZIPLenCH:"ZIP must be 4 digits (CH).", errZIPLenLI:"ZIP must be 4 digits (LI).", errZIPLenIT:"ZIP must be 5 digits (IT).", errZIPLenDE:"ZIP must be 5 digits (DE)." , expiry:"Note: For security, the confirmation link is valid for 7 days.", gateFail:"Verification failed. The link is invalid or expired.", gateOk:"Link verified – form enabled.", errInvalidToken:"Link invalid or already used.", errTokenExpired:"Link expired.", errTokenUsed:"Link already used.", errGeneric:"An error occurred. Please try again later." }
+  en: { title:"Please confirm your address", intro:"Fields are pre-filled and can be updated if needed.", ctx:"Please enter your complete and correct address details.", glaeubiger:"Creditor No.", firstname:"First name", name:"Last name", strasse:"Street", hausnummer:"No.", plz:"ZIP", ort:"City/Town", country:"Country", hintGlaeubiger:"Creditor number as stated in the letter.", hintFirst:"First name according to identity card.", hintName:"Last name according to identity card.", hintStrasse:"Street name without house number.", hintHausnummer:"House number as per official address.", hintZIP:"ZIP code according to country (CH/LI = 4 digits, DE/IT = 5 digits).", hintOrt:"City/Town as per official address.", hintCountry:"Country as per official address.", confirm:"I confirm that the information provided is correct.", privacy:"I consent to the processing of my data under GDPR.", privacyLink:"Privacy notice", submit:"Submit", errRequired:"Required field — please fill in.", errDigits:"Digits only.", errConfirm:"Please confirm the information is correct.", errPrivacy:"Please provide GDPR consent.", errZIPLenCH:"ZIP must be 4 digits (CH).", errZIPLenLI:"ZIP must be 4 digits (LI).", errZIPLenIT:"ZIP must be 5 digits (IT).", errZIPLenDE:"ZIP must be 5 digits (DE).", expiry:"Note: For security, the confirmation link is valid for 7 days.", gateFail:"Verification failed. The link is invalid or expired.", gateOk:"Link verified – form enabled.", errInvalidToken:"Link invalid or already used.", errTokenExpired:"Link expired.", errTokenUsed:"Link already used.", errGeneric:"An error occurred. Please try again later." }
 };
 
 function setLanguage(lang) {
@@ -29,7 +29,6 @@ function setLanguage(lang) {
 
 function qs(name) { const p = new URLSearchParams(location.search); return p.get(name) || ""; }
 
-// Robuster Base64url-Decoder (entfernt z.B. '..')
 function b64urlDecode(str) {
   if (!str) return "";
   let s = String(str).replace(/[^A-Za-z0-9\-_]/g, '');
@@ -70,6 +69,27 @@ function normalizeCountry(raw) {
   return "";
 }
 
+// Try to parse JSON regardless of content-type; unwrap common shapes
+async function parseJsonFlexible(resp) {
+  const text = await resp.text();
+  try {
+    const obj = JSON.parse(text);
+    // unwrap array with single item
+    let data = obj;
+    if (Array.isArray(data) && data.length === 1) data = data[0];
+    // unwrap { data: {...} } or { result: {...} }
+    if (data && typeof data === 'object') {
+      if ('data' in data && data.data && typeof data.data === 'object') data = data.data;
+      else if ('result' in data && data.result && typeof data.result === 'object') data = data.result;
+      else if ('record' in data && data.record && typeof data.record === 'object') data = data.record;
+    }
+    return data || {};
+  } catch {
+    // not JSON -> return empty
+    return {};
+  }
+}
+
 (async function init() {
   const lang = (qs('lang') || '').toLowerCase();
   const currentLang = ['de','it','en'].includes(lang) ? lang : 'de';
@@ -80,7 +100,6 @@ function normalizeCountry(raw) {
     const l = e.target.value; document.getElementById('lang').value = l; setLanguage(l);
   });
 
-  // URL-Params
   const id = qs('id');
   const token = qs('token');
   const em = qs('em');
@@ -90,7 +109,6 @@ function normalizeCountry(raw) {
     const el = document.getElementById('gate-error'); el.textContent = err; el.classList.remove('hidden'); el.focus?.(); return;
   }
 
-  // Email robust dekodieren; optionaler Fallback ?email=
   let email = b64urlDecode(em).trim();
   const emailQS = qs('email');
   if (!email && emailQS) email = emailQS.trim();
@@ -98,21 +116,21 @@ function normalizeCountry(raw) {
   safeSet('email', email); safeSet('id', id); safeSet('token', token); safeSet('em', em);
 
   try {
-    // 1) nach email
-    let resp = await fetch('/.netlify/functions/get_contact?email=' + encodeURIComponent(email));
-    let data = null;
+    let data = {};
     let lastErr = '';
+    // email first
+    let resp = await fetch('/.netlify/functions/get_contact?email=' + encodeURIComponent(email));
     if (resp.ok) {
-      data = await resp.json();
+      data = await parseJsonFlexible(resp);
     } else {
       lastErr = `email fetch ${resp.status}`;
     }
 
-    // 2) Fallback nach id
     if (!data || !Object.keys(data).length) {
+      // fallback by id
       resp = await fetch('/.netlify/functions/get_contact?id=' + encodeURIComponent(id));
       if (resp.ok) {
-        data = await resp.json();
+        data = await parseJsonFlexible(resp);
       } else {
         lastErr += ` | id fetch ${resp.status}`;
       }
@@ -122,10 +140,12 @@ function normalizeCountry(raw) {
       const el = document.getElementById('gate-error');
       el.textContent = `Verifizierung fehlgeschlagen – keine Daten (${lastErr || 'leer'})`;
       el.classList.remove('hidden'); el.scrollIntoView({behavior:'smooth', block:'center'});
+      // show raw debug line (safe)
+      const box = document.getElementById('ctx-box'); if (box) box.textContent = `Debug: email=${email} id=${id}`;
       return;
     }
 
-    // tolerant lesen (Umlaut/Groß/Klein)
+    // tolerant read
     const pick = (...keys) => {
       for (const k of keys) {
         const v = data[k];
@@ -137,17 +157,17 @@ function normalizeCountry(raw) {
       return "";
     };
 
-    const glaeubiger = pick('glaeubiger','gläubiger','Glaeubiger','Gläubiger','GLAEUBIGER','GLÄUBIGER');
+    const glaeubiger = pick('glaeubiger','gläubiger','Glaeubiger','Gläubiger','GLAEUBIGER','GLÄUBIGER','id','ID','Id');
     safeSet('glaeubiger', glaeubiger);
-    safeSet('firstname',  pick('firstname','vorname','Firstname','Vorname','FIRSTNAME'));
-    safeSet('name',       pick('name','nachname','Name','Nachname','NAME'));
-    safeSet('strasse',    pick('strasse','Strasse','street','Street'));
-    safeSet('hausnummer', pick('hausnummer','Hausnummer','HAUSNUMMER'));
-    safeSet('plz',        pick('plz','Plz','PLZ','zip','Zip'));
-    safeSet('ort',        pick('ort','Ort','city','City'));
-    safeSet('country',    pick('country','Country','land','Land'));
+    safeSet('firstname',  pick('firstname','vorname','Firstname','Vorname','FIRSTNAME','first_name','FirstName'));
+    safeSet('name',       pick('name','nachname','Name','Nachname','NAME','last_name','LastName'));
+    safeSet('strasse',    pick('strasse','Strasse','street','Street','adresse','address','Address'));
+    safeSet('hausnummer', pick('hausnummer','Hausnummer','HAUSNUMMER','street_no','StreetNo'));
+    safeSet('plz',        pick('plz','Plz','PLZ','zip','Zip','postal','postalCode','PostalCode'));
+    safeSet('ort',        pick('ort','Ort','city','City','town','Town'));
+    safeSet('country',    pick('country','Country','land','Land','country_code','CountryCode'));
 
-    // Strenger ID-Vergleich
+    // strict id check
     if (String(glaeubiger).trim() !== String(id).trim()) {
       const el = document.getElementById('gate-error');
       el.textContent = (i18n[currentLang] || i18n.de).gateFail + " (ID mismatch)";
@@ -165,7 +185,7 @@ function normalizeCountry(raw) {
     el.classList.remove('hidden'); el.scrollIntoView({behavior:'smooth', block:'center'});
   }
 
-  // Validierung
+  // Validation
   const req = ['firstname','name','strasse','hausnummer','plz','ort','country'];
   const validateField = (id) => {
     const dict = i18n[document.getElementById('lang').value] || i18n.de;
@@ -202,7 +222,6 @@ function normalizeCountry(raw) {
     validateField('plz');
   });
 
-  // Submit via AJAX
   const form = document.getElementById('verify-form');
   form.addEventListener('submit', async (e) => {
     let hasError = false;
