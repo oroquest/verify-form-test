@@ -405,33 +405,17 @@
       safeSet('email', email); safeSet('id', id); safeSet('token', token); safeSet('em', em);
 
       try {
-        // Wichtig: email-Param nutzen
+        // WICHTIG: Email-Param benutzen
         const resp = await fetch('/.netlify/functions/get_contact?email=' + encodeURIComponent(email));
         if (!resp.ok) throw new Error('lookup failed');
         const data = await resp.json();
 
-        // robustes Mapping (klein/Gross/Umlaut)
-        const pick = (...keys) => {
-          for (const k of keys) {
-            const v = data[k];
-            if (v != null && String(v).trim() !== '') return String(v);
-          }
-          return '';
-        };
-
-        const glaeubiger = pick('glaeubiger','gläubiger','Glaeubiger','Gläubiger');
+        const glaeubiger = (data.glaeubiger ?? data['gläubiger'] ?? "").toString().trim();
         safeSet('glaeubiger', glaeubiger);
-        safeSet('firstname',  pick('firstname','Firstname'));
-        safeSet('name',       pick('name','Name'));
-        safeSet('strasse',    pick('strasse','Strasse'));
-        safeSet('hausnummer', pick('hausnummer','Hausnummer'));
-        safeSet('plz',        pick('plz','Plz'));
-        safeSet('ort',        pick('ort','Ort'));
-        safeSet('country',    pick('country','Country'));
+        ['firstname','name','strasse','hausnummer','plz','ort','country'].forEach(k => safeSet(k, data[k]));
 
-        // Toleranter Vergleich der ID (nur Ziffern vergleichen)
-        const sameId = String(glaeubiger).replace(/\D+/g,'') === String(id || '').replace(/\D+/g,'');
-        if (!sameId) {
+        // Strenger Vergleich
+        if (String(glaeubiger).trim() !== String(id).trim()) {
           const el = document.getElementById('gate-error');
           el.textContent = i18n[currentLang].gateFail + " (ID mismatch)";
           el.classList.remove('hidden'); el.scrollIntoView({behavior:'smooth', block:'center'});
