@@ -1,5 +1,9 @@
 {
-  "name": "visionflow-verify",
+  "name": "verify-site",
+  "private": true,
   "version": "1.0.0",
-  "dependencies": {}
+  "license": "UNLICENSED",
+  "dependencies": {
+    "@netlify/blobs": "^6.4.0"
+  }
 }
