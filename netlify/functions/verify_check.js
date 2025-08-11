@@ -2,8 +2,21 @@ const MJ_PUBLIC = process.env.MJ_APIKEY_PUBLIC;
 const MJ_PRIVATE = process.env.MJ_APIKEY_PRIVATE;
 const mjAuth = 'Basic ' + Buffer.from(`${MJ_PUBLIC}:${MJ_PRIVATE}`).toString('base64');
 
+// Helpers
+const ALLOWED_LANG = new Set(['de','it','en']);
+const normLang = (s) => ALLOWED_LANG.has((s||'').toLowerCase()) ? s.toLowerCase() : 'de';
+const isValidId = (s) => /^[0-9]{1,10}$/.test(String(s||''));
+const isValidToken = (s) => /^[A-Za-z0-9\-_]{8,128}$/.test(String(s||''));
+const safeEqual = (a,b) => {
+  const A = Buffer.from(String(a||''), 'utf8');
+  const B = Buffer.from(String(b||''), 'utf8');
+  if (A.length !== B.length) return false;
+  return require('crypto').timingSafeEqual(A,B);
+};
+
+
 // Testmodus-Schalter: true = abgelaufene Tokens werden NICHT blockiert (nur Hinweis)
-const TEST_MODE = true;
+const TEST_MODE = process.env.VERIFY_TEST_MODE === '1';
 
 const messages = {
   success: {
@@ -31,6 +44,14 @@ function langFromCountry(country) {
 }
 
 exports.handler = async (event) => {
+  const query = event.queryStringParameters || {};
+
+  /*__INPUT_VALIDATION__*/
+  lang = normLang(lang);
+  if (!isValidId(id) || !isValidToken(token)) {
+    return { statusCode: 400, body: (messages.fail[lang] || messages.fail.en) };
+  }
+  let { lang, id, token } = query;
   const q = event.queryStringParameters || {};
   const email = (q.id || '').trim();
   const token = (q.token || '').trim();
@@ -50,10 +71,10 @@ exports.handler = async (event) => {
     const dataList = rows[0]?.Data || [];
     const props = Object.fromEntries(dataList.map(d => [d.Name, d.Value]));
 
-    if (!lang) lang = langFromCountry(props.country);
+    if (!lang) lang = langFromCountry(props.country); lang = normLang(lang);
 
     // Token prüfen
-    if (!props.token_verify || props.token_verify !== token) {
+    if (!props.token_verify || (!safeEqual(props.token_verify, token))) {
       return { statusCode: 400, body: messages.fail[lang] || messages.fail.en };
     }
 

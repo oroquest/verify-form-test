@@ -27,6 +27,8 @@ function b64urlDecode(input) {
   try { return Buffer.from(s, 'base64').toString('utf8'); } catch { return ''; }
 }
 
+
+function sanitizeHeader(s){ return String(s||'').replace(/[\r\n]+/g,' ').slice(0,200); }
 function firstIpFromHeader(xff) {
   if (!xff) return '';
   return String(xff).split(',')[0].trim();
