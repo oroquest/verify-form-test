@@ -2,7 +2,6 @@
   "name": "verify-site",
   "private": true,
   "version": "1.0.0",
-  "license": "UNLICENSED",
   "dependencies": {
     "@netlify/blobs": "^6.4.0"
   }
