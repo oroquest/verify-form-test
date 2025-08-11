@@ -1,57 +1,44 @@
 // netlify/functions/get_contact.js
-const MJ_PUBLIC  = process.env.MJ_APIKEY_PUBLIC;
-const MJ_PRIVATE = process.env.MJ_APIKEY_PRIVATE;
-const mjAuth = 'Basic ' + Buffer.from(`${MJ_PUBLIC}:${MJ_PRIVATE}`).toString('base64');
+const MJ_KEY = process.env.MJ_APIKEY_PUBLIC;
+const MJ_SECRET = process.env.MJ_APIKEY_PRIVATE;
+const MJ_BASE = "https://api.mailjet.com/v3/REST";
 
-function cors() {
-  return {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization'
-  };
-}
+const auth = "Basic " + Buffer.from(`${MJ_KEY}:${MJ_SECRET}`).toString("base64");
+const ok = (obj) => ({ statusCode: 200, headers: { "Content-Type": "application/json" }, body: JSON.stringify(obj) });
+const bad = (s, e) => ({ statusCode: s, headers: { "Content-Type": "application/json" }, body: JSON.stringify(e) });
 
 exports.handler = async (event) => {
-  if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 200, headers: cors(), body: '' };
-  }
-  if (event.httpMethod !== 'GET') {
-    return { statusCode: 405, headers: cors(), body: 'Method Not Allowed' };
-  }
-
-  const p = event.queryStringParameters || {};
-  const email = String(p.email || p.id || '').trim().toLowerCase();
-  if (!email) return { statusCode: 400, headers: cors(), body: 'missing email' };
-
   try {
-    const r = await fetch(`https://api.mailjet.com/v3/REST/contactdata/${encodeURIComponent(email)}`, {
-      headers: { Authorization: mjAuth }
-    });
-    if (!r.ok) {
-      const t = await r.text();
-      return { statusCode: 502, headers: cors(), body: `Mailjet fetch failed: ${t}` };
-    }
-    const json = await r.json();
-    const props = Object.fromEntries((json.Data?.[0]?.Data || []).map(p => [p.Name, p.Value]));
+    const q = new URLSearchParams(event.rawQuery || "");
+    const email = (q.get("email") || q.get("id") || "").trim();
+    if (!email) return bad(400, { error: "missing_email" });
 
-    // Map für dein Frontend (inkl. Umlaute/glaeubiger-Fallback)
+    // 1) contactdata abrufen
+    const r = await fetch(`${MJ_BASE}/contactdata/${encodeURIComponent(email)}`, { headers: { Authorization: auth } });
+    const t = await r.text();
+    if (!r.ok) return bad(r.status, { error: "mailjet_error", detail: t });
+    const j = t ? JSON.parse(t) : {};
+    const props = {};
+    for (const item of (j?.Data?.[0]?.Data || [])) props[item.Name] = item.Value;
+
+    // 2) Mapping auf erwartete Keys (robust: klein/Gross/umlaut)
+    const pick = (...keys) => {
+      for (const k of keys) if (props[k] != null && String(props[k]).trim() !== "") return String(props[k]);
+      return "";
+    };
     const data = {
-      glaeubiger: props['gläubiger'] ?? props['glaeubiger'] ?? '',
-      firstname:  props['firstname']  ?? '',
-      name:       props['name']       ?? '',
-      strasse:    props['strasse']    ?? '',
-      hausnummer: props['hausnummer'] ?? '',
-      plz:        props['plz']        ?? '',
-      ort:        props['ort']        ?? '',
-      country:    props['country']    ?? ''
+      glaeubiger: pick("glaeubiger", "Glaeubiger", "Gläubiger"),
+      firstname : pick("firstname", "Firstname"),
+      name      : pick("name", "Name"),
+      strasse   : pick("strasse", "Strasse"),
+      hausnummer: pick("hausnummer", "Hausnummer"),
+      plz       : pick("plz", "Plz"),
+      ort       : pick("ort", "Ort"),
+      country   : pick("country", "Country"),
     };
 
-    return {
-      statusCode: 200,
-      headers: { ...cors(), 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
-    };
+    return ok(data);
   } catch (e) {
-    return { statusCode: 500, headers: cors(), body: 'server error: ' + e.message };
+    return bad(500, { error: "crash", message: String(e) });
   }
 };
