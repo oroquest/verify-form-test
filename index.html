@@ -1,20 +1,20 @@
 <!DOCTYPE html>
 <html lang="de">
 <head>
-<meta charset="UTF-8"/>
-<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
-<title>Sikura – Adressbestätigung</title>
-<style>
-  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f5f6f8;margin:0}
-  .container{max-width:760px;margin:32px auto;background:#fff;padding:24px;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.06)}
-  label{display:block;margin:12px 0 6px;font-weight:600}
-  input[type=text]{width:100%;padding:12px;border:1px solid #d1d5db;border-radius:10px}
-  input[readonly]{background:#f3f4f6;color:#6b7280}
-  .row{display:flex;gap:16px}.row>div{flex:1}
-  .hidden{display:none}
-  #gate-error{margin:8px 0;padding:8px 12px;background:#fff1f2;border:1px solid #fecdd3;border-radius:10px;color:#b91c1c}
-  #gate-ok{margin:8px 0;color:#065f46}
-</style>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Sikura – Adressbestätigung</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,sans-serif;background:#f5f6f8;margin:0}
+    .container{max-width:760px;margin:32px auto;background:#fff;padding:24px;border-radius:14px;box-shadow:0 8px 24px rgba(0,0,0,.06)}
+    label{display:block;margin:12px 0 6px;font-weight:600}
+    input[type=text]{width:100%;padding:12px;border:1px solid #d1d5db;border-radius:10px}
+    input[readonly]{background:#f3f4f6;color:#6b7280}
+    .row{display:flex;gap:16px}.row>div{flex:1}
+    .hidden{display:none}
+    #gate-error{margin:8px 0;padding:8px 12px;background:#fff1f2;border:1px solid #fecdd3;border-radius:10px;color:#b91c1c}
+    #gate-ok{margin:8px 0;color:#065f46}
+  </style>
 </head>
 <body>
 <div class="container">
@@ -50,47 +50,7 @@
   </form>
 </div>
 
-<script>
-const qs = n => new URLSearchParams(location.search).get(n) || "";
-function b64urlDecode(s){ if(!s) return ""; s=s.replace(/-/g,"+").replace(/_/g,"/"); while(s.length%4)s+="="; try{return decodeURIComponent(escape(atob(s)))}catch(e){try{return atob(s)}catch{return ""}}}
-function setVal(id,v){ if(v!=null && String(v).trim()!=="") document.getElementById(id).value=String(v).trim(); }
-
-(async () => {
-  const id=qs("id"), token=qs("token"), em=qs("em");
-  const email=b64urlDecode(em) || qs("email") || "";
-  if(!id || !token || !em){ const e=document.getElementById("gate-error"); e.textContent="Link ungültig oder unvollständig."; e.classList.remove("hidden"); return; }
-
-  setVal("email",email); setVal("id",id); setVal("token",token); setVal("em",em);
-
-  try{
-    // WICHTIG: zuerst per EMAIL suchen (richtiges Param!)
-    let resp = await fetch("/.netlify/functions/get_contact?email="+encodeURIComponent(email));
-    let data = resp.ok ? await resp.json() : null;
-
-    // Fallback: per ID versuchen, falls Email-Query nichts liefert
-    if(!data || !Object.keys(data).length){
-      resp = await fetch("/.netlify/functions/get_contact?id="+encodeURIComponent(id));
-      data = resp.ok ? await resp.json() : null;
-    }
-    if(!data || !Object.keys(data).length) throw new Error("no_contact");
-
-    // gläubiger: wenn leer, ID aus URL einsetzen
-    let glaeubiger = (data.glaeubiger ?? data["gläubiger"] ?? "").toString().trim();
-    if(!glaeubiger) glaeubiger = id;
-    setVal("glaeubiger", glaeubiger);
-
-    // restliche Felder
-    ["firstname","name","strasse","hausnummer","plz","ort","country"].forEach(k => setVal(k, data[k]));
-
-    document.getElementById("gate-ok").textContent = "Link geprüft – Formular freigeschaltet.";
-    document.getElementById("gate-ok").classList.remove("hidden");
-    document.getElementById("verify-form").classList.remove("hidden");
-  }catch(e){
-    const er=document.getElementById("gate-error");
-    er.textContent = "Verifizierung fehlgeschlagen oder keine Kontaktdaten gefunden.";
-    er.classList.remove("hidden");
-  }
-})();
-</script>
+<!-- Wichtig: extern laden, kein inline JS -->
+<script src="/app.js" defer></script>
 </body>
 </html>
