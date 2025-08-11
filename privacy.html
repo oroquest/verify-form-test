@@ -234,6 +234,27 @@
     <p class="foot"></p>
   </div>
 
-    <script src="/script.js" defer></script>
+  <script>
+    function qs(name) { const p = new URLSearchParams(location.search); return p.get(name) || ""; }
+    function setVisible(lang) {
+      var ids = ['de','it','en'];
+      ids.forEach(function(k) {
+        var el = document.getElementById('lang-' + k);
+        if (el) el.style.display = (k===lang ? 'block' : 'none');
+      });
+      document.documentElement.lang = lang;
+      var url = new URL(location.href);
+      url.searchParams.set('lang', lang);
+      history.replaceState({}, '', url);
+    }
+    (function init() {
+      var select = document.getElementById('language');
+      var lang = (qs('lang')||'de').toLowerCase();
+      var current = ['de','it','en'].includes(lang) ? lang : 'de';
+      select.value = current;
+      setVisible(current);
+      select.addEventListener('change', function(e) { setVisible(e.target.value); });
+    })();
+  </script>
 </body>
 </html>
