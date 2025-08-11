@@ -1,4 +1,4 @@
-// app.js — CSP‑konform, hübsches UI, und Submit als x-www-form-urlencoded (fix für {"error":"invalid_json"})
+// app.js — CSP‑konform, hübsches UI, Client‑Validation & detailierte Serverfehler
 const i18n = {
   de:{title:"Bitte bestätigen Sie Ihre Adresse",intro:"Felder sind vorbefüllt und können bei Bedarf aktualisiert werden.",ctx:"Bitte geben Sie Ihre vollständigen und korrekten Adressdaten ein.",submit:"Absenden",gateFail:"Verifizierung fehlgeschlagen. Der Link ist ungültig oder abgelaufen.",gateOk:"Link geprüft – Formular freigeschaltet.",errGeneric:"Es ist ein Fehler aufgetreten. Bitte versuchen Sie es später erneut."},
   en:{title:"Please confirm your address",intro:"Fields are pre-filled and can be updated if needed.",ctx:"Please enter your complete and correct address details.",submit:"Submit",gateFail:"Verification failed. The link is invalid or expired.",gateOk:"Link verified – form enabled.",errGeneric:"An error occurred. Please try again later."},
@@ -16,6 +16,33 @@ function setLanguage(lang){
   document.getElementById('ctx-box').textContent=d.ctx;
   document.getElementById('btn-submit').textContent=d.submit;
   const pl=document.getElementById('privacy-link'); if(pl) pl.href=`privacy.html?lang=${lang}`;
+}
+
+function normalizeCountry(raw){
+  const s=(raw||"").trim().toLowerCase();
+  if(["ch","che","schweiz","switzerland","suisse","svizzera"].includes(s)) return "CH";
+  if(["li","liechtenstein","lichtenstein"].includes(s)) return "LI";
+  if(["de","deu","deutschland","germany","alemania"].includes(s)) return "DE";
+  if(["it","ita","italien","italia","italy"].includes(s)) return "IT";
+  return s.toUpperCase();
+}
+
+function validateFrontend(){
+  const req = ["firstname","name","strasse","hausnummer","plz","ort","country"];
+  for (const id of req) {
+    const el = document.getElementById(id);
+    const v = (el.value||"").trim();
+    el.classList.remove('error-field');
+    if(!v){ el.classList.add('error-field'); return `Fehlendes Feld: ${id}`; }
+  }
+  const cc = normalizeCountry(document.getElementById("country").value);
+  const plzEl = document.getElementById("plz");
+  plzEl.value = plzEl.value.replace(/\D+/g,"");
+  const plz = plzEl.value;
+  if(!/^\d+$/.test(plz)) return "PLZ: nur Ziffern erlaubt";
+  if(cc==="CH"||cc==="LI"){ if(plz.length!==4) return "PLZ (CH/LI) muss 4-stellig sein"; }
+  if(cc==="DE"||cc==="IT"){ if(plz.length!==5) return "PLZ (DE/IT) muss 5-stellig sein"; }
+  return "";
 }
 
 (async () => {
@@ -51,12 +78,16 @@ function setLanguage(lang){
     errBox.textContent=(i18n[lang]||i18n.de).gateFail; errBox.classList.remove("hidden"); return;
   }
 
-  // AJAX Submit: urlencoded (Server erwartet das) → verhindert {"error":"invalid_json"}
+  // Submit x-www-form-urlencoded mit besserer Fehleranzeige
   form.addEventListener('submit', async (ev)=>{
     ev.preventDefault();
+    const vErr = validateFrontend();
+    if (vErr) { errBox.textContent = vErr; errBox.classList.remove('hidden'); return; }
+
     const fd=new FormData(form);
     const body=new URLSearchParams(fd).toString();
     errBox.classList.add('hidden'); errBox.textContent="";
+
     try{
       const resp=await fetch(form.action,{
         method:'POST',
@@ -73,8 +104,9 @@ function setLanguage(lang){
         if(resp.redirected){ location.href=resp.url; return; }
         location.href='/danke.html'; return;
       }
-      const msg = (i18n[lang]||i18n.de).errGeneric;
-      errBox.textContent = msg + ` (Server: ${resp.status})`;
+      const detail = await resp.text().catch(()=> "");
+      const msg = (i18n[lang]||i18n.de).errGeneric + ` (Server: ${resp.status})`;
+      errBox.textContent = detail && detail.length < 300 ? `${msg} — ${detail}` : msg;
       errBox.classList.remove('hidden');
     }catch(err){
       errBox.textContent=(i18n[lang]||i18n.de).errGeneric;
