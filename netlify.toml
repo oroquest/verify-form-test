@@ -1,11 +1,3 @@
-[build]
-  functions = "netlify/functions"
-
-[[headers]]
-  for = "/.netlify/functions/*"
-  [headers.values]
-    Access-Control-Allow-Origin = "${ALLOWED_ORIGIN}"
-    Vary = "Origin"
-    X-Content-Type-Options = "nosniff"
-    X-Frame-Options = "DENY"
-    Referrer-Policy = "no-referrer-when-downgrade"
+[functions]
+  node_bundler = "esbuild"
+  directory = "netlify/functions"
