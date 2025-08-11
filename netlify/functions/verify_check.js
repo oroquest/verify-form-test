@@ -1,93 +1,91 @@
-const MJ_PUBLIC = process.env.MJ_APIKEY_PUBLIC;
-const MJ_PRIVATE = process.env.MJ_APIKEY_PRIVATE;
-const mjAuth = 'Basic ' + Buffer.from(`${MJ_PUBLIC}:${MJ_PRIVATE}`).toString('base64');
+// netlify/functions/verify_check.js
+// Prueft, ob ein Verifizierungs-Token gueltig ist (existiert, nicht abgelaufen, nicht verbraucht).
 
-// Testmodus-Schalter: true = abgelaufene Tokens werden NICHT blockiert (nur Hinweis)
-const TEST_MODE = true;
+const fetch = (...args) => import('node-fetch').then(({ default: f }) => f(...args));
+const MJ_BASE = "https://api.mailjet.com/v3/REST";
+const { MJ_APIKEY_PUBLIC, MJ_APIKEY_PRIVATE } = process.env;
 
-const messages = {
-  success: {
-    de: "✅ Vielen Dank – Ihre E-Mail-Adresse und Adresse wurden erfolgreich bestätigt.",
-    it: "✅ Grazie – Il tuo indirizzo e-mail e l’indirizzo sono stati confermati con successo.",
-    en: "✅ Thank you – Your e-mail address and postal address have been successfully confirmed."
-  },
-  fail: {
-    de: "❌ Ungültiger oder abgelaufener Verifizierungslink.",
-    it: "❌ Link di verifica non valido o scaduto.",
-    en: "❌ Invalid or expired verification link."
-  },
-  warn: {
-    de: "⚠ Hinweis: Der Link ist älter als die zulässige Gültigkeit. (Testmodus – keine Sperre)",
-    it: "⚠ Avviso: Il link è più vecchio della validità consentita. (Modalità test – nessun blocco)",
-    en: "⚠ Notice: The link is older than the allowed validity. (Test mode – no blocking)"
-  }
-};
-
-function langFromCountry(country) {
-  const c = (country || '').toUpperCase();
-  if (c === 'CH' || c === 'DE' || c === 'AT') return 'de';
-  if (c === 'IT') return 'it';
-  return 'en';
+// Vereinheitlichte Auslese des Ablaufdatums
+function normalizeExpiry(props) {
+  const keys = ["Token_verify_expiry", "token_verify_expiry", "token_expiry", "Token_expiry"];
+  for (const k of keys) if (props && props[k]) return props[k];
+  return "";
 }
 
 exports.handler = async (event) => {
-  const q = event.queryStringParameters || {};
-  const email = (q.id || '').trim();
-  const token = (q.token || '').trim();
-  let lang = (q.lang || '').toLowerCase();
-
-  if (!email || !token) return { statusCode: 400, body: 'Missing parameters' };
-
   try {
-    // Kontakt-Properties auslesen
-    const resp = await fetch(`https://api.mailjet.com/v3/REST/contactdata/${encodeURIComponent(email)}`, {
-      headers: { Authorization: mjAuth }
-    });
-    if (!resp.ok) return { statusCode: 500, body: `Mailjet fetch failed: ${await resp.text()}` };
+    // ---- Input ----
+    const qs = event.queryStringParameters || {};
+    const lang  = (qs.lang || "de").toLowerCase();
+    const token = (qs.token || "").trim();
+    const id    = (qs.id || "").trim();     // Kreditoren-ID
+    const emB64 = (qs.em || "").trim();     // E-Mail (base64)
+    const email = emB64 ? Buffer.from(emB64, "base64").toString("utf8") : "";
 
-    const body = await resp.json();
-    const rows = body.Data || [];
-    const dataList = rows[0]?.Data || [];
-    const props = Object.fromEntries(dataList.map(d => [d.Name, d.Value]));
-
-    if (!lang) lang = langFromCountry(props.country);
-
-    // Token prüfen
-    if (!props.token_verify || props.token_verify !== token) {
-      return { statusCode: 400, body: messages.fail[lang] || messages.fail.en };
+    if (!token || !id || !email) {
+      return { statusCode: 400, body: "Missing token, id or em" };
     }
 
-    // Ablaufdatum prüfen
-    let warnPrefix = "";
-    if (props.token_expiry) {
+    // ---- Mailjet: Contact + Properties laden ----
+    const auth = "Basic " + Buffer.from(`${MJ_APIKEY_PUBLIC}:${MJ_APIKEY_PRIVATE}`).toString("base64");
+
+    // 1) Contact per E-Mail
+    const r1 = await fetch(`${MJ_BASE}/contact/${encodeURIComponent(email)}`, {
+      headers: { Authorization: auth }
+    });
+    if (!r1.ok) {
+      const err = await r1.text();
+      return { statusCode: 502, body: `Mailjet contact fetch failed: ${err}` };
+    }
+    const c = await r1.json();
+    const ContactID = c.Data?.[0]?.ID;
+    if (!ContactID) return { statusCode: 404, body: "Contact not found" };
+
+    // 2) Contactdata (Properties)
+    const r2 = await fetch(`${MJ_BASE}/contactdata/${ContactID}`, {
+      headers: { Authorization: auth }
+    });
+    if (!r2.ok) {
+      const err = await r2.text();
+      return { statusCode: 502, body: `Mailjet contactdata fetch failed: ${err}` };
+    }
+    const d = await r2.json();
+    const props = {};
+    for (const p of (d.Data?.[0]?.Data || [])) props[p.Name] = p.Value;
+
+    // ---- Prüfungen ----
+
+    // ID passend?
+    const propId = (props["glaeubiger"] || props["Glaeubiger"] || "").toString();
+    if (propId !== id.toString()) {
+      return { statusCode: 400, body: "ID does not match" };
+    }
+
+    // Token passend?
+    const stored = (props["token_verify"] || "").toString();
+    if (!stored || stored !== token) {
+      return { statusCode: 400, body: "Invalid token" };
+    }
+
+    // Bereits verbraucht?
+    if (props["token_verify_used_at"]) {
+      return { statusCode: 409, body: "Token already used" };
+    }
+
+    // Abgelaufen?
+    const expiryRaw = normalizeExpiry(props);
+    if (expiryRaw) {
       const now = new Date();
-      const exp = new Date(props.token_expiry);
+      const exp = new Date(expiryRaw);
       if (isFinite(exp) && now > exp) {
-        if (TEST_MODE) {
-          warnPrefix = (messages.warn[lang] || messages.warn.en) + "\n\n";
-        } else {
-          return { statusCode: 410, body: messages.fail[lang] || messages.fail.en };
-        }
+        return { statusCode: 410, body: "Token expired" };
       }
     }
 
-    // Token & Link leeren
-    await fetch(`https://api.mailjet.com/v3/REST/contactdata/${encodeURIComponent(email)}`, {
-      method: 'PUT',
-      headers: { Authorization: mjAuth, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        Data: [
-          { Name: 'token_verify', Value: '' },
-          { Name: 'link_verify', Value: '' }
-        ]
-      })
-    });
+    // Alles ok
+    return { statusCode: 200, body: "OK" };
 
-    return {
-      statusCode: 200,
-      body: warnPrefix + (messages.success[lang] || messages.success.en)
-    };
-  } catch (e) {
-    return { statusCode: 500, body: `Server error: ${e.message}` };
+  } catch (err) {
+    return { statusCode: 500, body: `Server error: ${err.message}` };
   }
 };
