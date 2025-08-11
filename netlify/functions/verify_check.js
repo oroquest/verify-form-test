@@ -1,125 +1,93 @@
-// netlify/functions/verify_check.js
-// Prüft, ob ein Verifizierungs-Token gültig ist (existiert, nicht abgelaufen, nicht verbraucht).
-// Nutzt globales fetch (Node 18/20). Kein node-fetch nötig.
+const MJ_PUBLIC = process.env.MJ_APIKEY_PUBLIC;
+const MJ_PRIVATE = process.env.MJ_APIKEY_PRIVATE;
+const mjAuth = 'Basic ' + Buffer.from(`${MJ_PUBLIC}:${MJ_PRIVATE}`).toString('base64');
 
-const MJ_BASE = "https://api.mailjet.com/v3/REST";
-const { MJ_APIKEY_PUBLIC, MJ_APIKEY_PRIVATE } = process.env;
+// Testmodus-Schalter: true = abgelaufene Tokens werden NICHT blockiert (nur Hinweis)
+const TEST_MODE = true;
 
-// Alias/Normalisierung für Property-Namen (Umlaute, ß, Case)
-function aliasKey(name = "") {
-  let s = String(name).toLowerCase();
-  // explizite deutsche Umlaute/ß -> ASCII
-  s = s
-    .replace(/ä/g, "ae")
-    .replace(/ö/g, "oe")
-    .replace(/ü/g, "ue")
-    .replace(/ß/g, "ss");
-  // evtl. restliche diakritische Zeichen entfernen (sicherheitsnetz)
-  s = s.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
-  return s;
-}
+const messages = {
+  success: {
+    de: "✅ Vielen Dank – Ihre E-Mail-Adresse und Adresse wurden erfolgreich bestätigt.",
+    it: "✅ Grazie – Il tuo indirizzo e-mail e l’indirizzo sono stati confermati con successo.",
+    en: "✅ Thank you – Your e-mail address and postal address have been successfully confirmed."
+  },
+  fail: {
+    de: "❌ Ungültiger oder abgelaufener Verifizierungslink.",
+    it: "❌ Link di verifica non valido o scaduto.",
+    en: "❌ Invalid or expired verification link."
+  },
+  warn: {
+    de: "⚠ Hinweis: Der Link ist älter als die zulässige Gültigkeit. (Testmodus – keine Sperre)",
+    it: "⚠ Avviso: Il link è più vecchio della validità consentita. (Modalità test – nessun blocco)",
+    en: "⚠ Notice: The link is older than the allowed validity. (Test mode – no blocking)"
+  }
+};
 
-// Vereinheitlichte Auslese des Ablaufdatums
-function normalizeExpiry(propsRaw, propsAlias) {
-  const keys = [
-    "Token_verify_expiry",
-    "token_verify_expiry",
-    "token_expiry",
-    "Token_expiry"
-  ];
-  for (const k of keys) if (propsRaw && propsRaw[k]) return propsRaw[k];
-  // alias-Variante (falls jemand aliasierte Namen verwendet)
-  const aliasKeys = keys.map(aliasKey);
-  for (const ak of aliasKeys) if (propsAlias && propsAlias[ak]) return propsAlias[ak];
-  return "";
+function langFromCountry(country) {
+  const c = (country || '').toUpperCase();
+  if (c === 'CH' || c === 'DE' || c === 'AT') return 'de';
+  if (c === 'IT') return 'it';
+  return 'en';
 }
 
 exports.handler = async (event) => {
+  const q = event.queryStringParameters || {};
+  const email = (q.id || '').trim();
+  const token = (q.token || '').trim();
+  let lang = (q.lang || '').toLowerCase();
+
+  if (!email || !token) return { statusCode: 400, body: 'Missing parameters' };
+
   try {
-    // ---- Input ----
-    const qs = event.queryStringParameters || {};
-    const lang  = (qs.lang || "de").toLowerCase();
-    const token = (qs.token || "").trim();
-    const id    = (qs.id || "").trim();     // Kreditoren-ID
-    const emB64 = (qs.em || "").trim();     // E-Mail (base64)
-    const email = emB64 ? Buffer.from(emB64, "base64").toString("utf8") : "";
-
-    if (!token || !id || !email) {
-      return { statusCode: 400, body: "Missing token, id or em" };
-    }
-
-    // ---- Mailjet: Contact + Properties laden ----
-    const auth = "Basic " + Buffer.from(`${MJ_APIKEY_PUBLIC}:${MJ_APIKEY_PRIVATE}`).toString("base64");
-
-    // 1) Contact per E-Mail
-    const r1 = await fetch(`${MJ_BASE}/contact/${encodeURIComponent(email)}`, {
-      headers: { Authorization: auth }
+    // Kontakt-Properties auslesen
+    const resp = await fetch(`https://api.mailjet.com/v3/REST/contactdata/${encodeURIComponent(email)}`, {
+      headers: { Authorization: mjAuth }
     });
-    if (!r1.ok) {
-      const err = await r1.text();
-      return { statusCode: 502, body: `Mailjet contact fetch failed: ${err}` };
-    }
-    const c = await r1.json();
-    const ContactID = c.Data?.[0]?.ID;
-    if (!ContactID) return { statusCode: 404, body: "Contact not found" };
+    if (!resp.ok) return { statusCode: 500, body: `Mailjet fetch failed: ${await resp.text()}` };
 
-    // 2) Contactdata (Properties)
-    const r2 = await fetch(`${MJ_BASE}/contactdata/${ContactID}`, {
-      headers: { Authorization: auth }
-    });
-    if (!r2.ok) {
-      const err = await r2.text();
-      return { statusCode: 502, body: `Mailjet contactdata fetch failed: ${err}` };
-    }
-    const d = await r2.json();
+    const body = await resp.json();
+    const rows = body.Data || [];
+    const dataList = rows[0]?.Data || [];
+    const props = Object.fromEntries(dataList.map(d => [d.Name, d.Value]));
 
-    // propsRaw: Original-Namen, propsAlias: normalisierte Aliase (z.B. gläubiger -> glaeubiger)
-    const propsRaw = {};
-    const propsAlias = {};
-    for (const p of (d.Data?.[0]?.Data || [])) {
-      propsRaw[p.Name] = p.Value;
-      propsAlias[aliasKey(p.Name)] = p.Value;
+    if (!lang) lang = langFromCountry(props.country);
+
+    // Token prüfen
+    if (!props.token_verify || props.token_verify !== token) {
+      return { statusCode: 400, body: messages.fail[lang] || messages.fail.en };
     }
 
-    // ---- Prüfungen ----
-
-    // ID passend? (gläubiger / glaeubiger akzeptieren)
-    const idFromProps =
-      propsRaw["glaeubiger"] ??
-      propsRaw["Glaeubiger"] ??
-      propsRaw["gläubiger"] ??
-      propsRaw["Gläubiger"] ??
-      propsAlias["glaeubiger"]; // alias erfasst beide Varianten
-    if (String(idFromProps ?? "") !== id.toString()) {
-      return { statusCode: 400, body: "ID does not match" };
-    }
-
-    // Token passend?
-    const stored =
-      (propsRaw["token_verify"] ?? propsAlias["token_verify"] ?? "").toString();
-    if (!stored || stored !== token) {
-      return { statusCode: 400, body: "Invalid token" };
-    }
-
-    // Bereits verbraucht?
-    if (propsRaw["token_verify_used_at"] || propsAlias["token_verify_used_at"]) {
-      return { statusCode: 409, body: "Token already used" };
-    }
-
-    // Abgelaufen?
-    const expiryRaw = normalizeExpiry(propsRaw, propsAlias);
-    if (expiryRaw) {
+    // Ablaufdatum prüfen
+    let warnPrefix = "";
+    if (props.token_expiry) {
       const now = new Date();
-      const exp = new Date(expiryRaw);
+      const exp = new Date(props.token_expiry);
       if (isFinite(exp) && now > exp) {
-        return { statusCode: 410, body: "Token expired" };
+        if (TEST_MODE) {
+          warnPrefix = (messages.warn[lang] || messages.warn.en) + "\n\n";
+        } else {
+          return { statusCode: 410, body: messages.fail[lang] || messages.fail.en };
+        }
       }
     }
 
-    // Alles ok
-    return { statusCode: 200, body: "OK" };
+    // Token & Link leeren
+    await fetch(`https://api.mailjet.com/v3/REST/contactdata/${encodeURIComponent(email)}`, {
+      method: 'PUT',
+      headers: { Authorization: mjAuth, 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        Data: [
+          { Name: 'token_verify', Value: '' },
+          { Name: 'link_verify', Value: '' }
+        ]
+      })
+    });
 
-  } catch (err) {
-    return { statusCode: 500, body: `Server error: ${err.message}` };
+    return {
+      statusCode: 200,
+      body: warnPrefix + (messages.success[lang] || messages.success.en)
+    };
+  } catch (e) {
+    return { statusCode: 500, body: `Server error: ${e.message}` };
   }
 };
