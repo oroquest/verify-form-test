@@ -1,7 +1,7 @@
 // netlify/functions/verify_check.js
-// Prueft, ob ein Verifizierungs-Token gueltig ist (existiert, nicht abgelaufen, nicht verbraucht).
+// Prüft, ob ein Verifizierungs-Token gültig ist (existiert, nicht abgelaufen, nicht verbraucht).
+// Hinweis: nutzt das globale fetch (Node 18/20). KEIN node-fetch nötig.
 
-const fetch = (...args) => import('node-fetch').then(({ default: f }) => f(...args));
 const MJ_BASE = "https://api.mailjet.com/v3/REST";
 const { MJ_APIKEY_PUBLIC, MJ_APIKEY_PRIVATE } = process.env;
 
@@ -54,25 +54,19 @@ exports.handler = async (event) => {
     for (const p of (d.Data?.[0]?.Data || [])) props[p.Name] = p.Value;
 
     // ---- Prüfungen ----
-
-    // ID passend?
-    const propId = (props["glaeubiger"] || props["Glaeubiger"] || "").toString();
-    if (propId !== id.toString()) {
+    if ((props["glaeubiger"] || props["Glaeubiger"] || "").toString() !== id.toString()) {
       return { statusCode: 400, body: "ID does not match" };
     }
 
-    // Token passend?
     const stored = (props["token_verify"] || "").toString();
     if (!stored || stored !== token) {
       return { statusCode: 400, body: "Invalid token" };
     }
 
-    // Bereits verbraucht?
     if (props["token_verify_used_at"]) {
       return { statusCode: 409, body: "Token already used" };
     }
 
-    // Abgelaufen?
     const expiryRaw = normalizeExpiry(props);
     if (expiryRaw) {
       const now = new Date();
@@ -82,7 +76,6 @@ exports.handler = async (event) => {
       }
     }
 
-    // Alles ok
     return { statusCode: 200, body: "OK" };
 
   } catch (err) {
