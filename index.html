@@ -5,107 +5,138 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>Sikura – Adressbestätigung</title>
   <style>
-    body { font-family: system-ui, sans-serif; background:#f5f6f8; margin:0; }
-    .container { max-width:760px; margin:32px auto; background:#fff; padding:24px; border-radius:14px; }
-    label { display:block; margin:12px 0 6px; font-weight:600; }
-    input[type="text"] { width:100%; padding:12px; border:1px solid #d1d5db; border-radius:10px; }
-    input[readonly] { background:#f3f4f6; color:#6b7280; }
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; background:#f5f6f8; margin:0; }
+    .container { max-width:760px; margin:32px auto; background:#fff; padding:24px; border-radius:14px; box-shadow:0 8px 24px rgba(0,0,0,.06); }
     .row { display:flex; gap:16px; }
     .row > div { flex:1; }
+    label { display:block; margin:12px 0 6px; font-weight:600; }
+    input[type="text"], textarea, select { width:100%; padding:12px; border:1px solid #d1d5db; border-radius:10px; font-size:16px; background:#fff; }
+    input[readonly] { background:#f3f4f6; color:#6b7280; }
+    .language-switcher { display:flex; justify-content:flex-end; margin-bottom:8px; }
+    .checkbox-group { margin-top:12px; }
+    .checkbox-line { display:flex; gap:8px; align-items:flex-start; }
+    .hint { font-size:14px; color:#6b7280; margin-top:6px; }
+    .ctx { background:#f9fafb; border:1px solid #e5e7eb; padding:12px; border-radius:10px; margin:12px 0 16px; }
+    .field-error { color:#b91c1c; font-size:13px; margin-top:4px; display:none; }
+    .ok { color:#065f46; margin:10px 0; display:none; }
+    button { margin-top:18px; padding:12px 18px; border:0; background:#0f172a; color:#fff; border-radius:10px; font-size:16px; cursor:pointer; }
+    button:disabled { opacity:.6; cursor:not-allowed; }
+    .logo { height:48px; margin-bottom:12px; }
     .hidden { display:none; }
-    .ok { color:green; margin:8px 0; }
-    .field-error { color:red; font-size:0.9em; display:none; }
+    .error-field { border-color:#b91c1c !important; }
+    .linkline { margin-top:4px; }
+    #gate-error { padding:8px 12px; background:#fff1f2; border:1px solid #fecdd3; border-radius:10px; }
   </style>
 </head>
 <body>
-<div class="container">
-  <h2>Bitte bestätigen Sie Ihre Adresse</h2>
-  <div id="gate-error" class="field-error hidden"></div>
-  <div id="gate-ok" class="ok hidden"></div>
+  <div class="container">
+    <div class="language-switcher">
+      <select id="language">
+        <option value="de">Deutsch</option>
+        <option value="it">Italiano</option>
+        <option value="en">English</option>
+      </select>
+    </div>
 
-  <form id="verify-form" class="hidden" method="POST" action="/.netlify/functions/verify_submit">
-    <input type="hidden" id="email" name="email" />
-    <input type="hidden" id="lang" name="lang" />
-    <input type="hidden" id="id" name="id" />
-    <input type="hidden" id="token" name="token" />
-    <input type="hidden" id="em" name="em" />
+    <img src="siku_logo.png" alt="Sikura Life" class="logo" />
+    <h2 id="title">Bitte bestätigen Sie Ihre Adresse</h2>
+    <p id="intro" class="hint">Felder sind vorbefüllt und können bei Bedarf aktualisiert werden.</p>
 
-    <label>Gläubiger-Nr.</label>
-    <input type="text" id="glaeubiger" name="glaeubiger" readonly />
+    <div id="ctx-box" class="ctx"></div>
 
-    <label>Vorname</label>
-    <input type="text" id="firstname" name="firstname" readonly />
+    <div id="gate-error" class="field-error hidden" role="alert" aria-live="polite"></div>
+    <div id="gate-ok" class="ok hidden"></div>
 
-    <label>Nachname</label>
-    <input type="text" id="name" name="name" readonly />
+    <form id="verify-form" class="hidden" method="POST" action="/.netlify/functions/verify_submit" novalidate>
+      <input type="hidden" id="email" name="email" />
+      <input type="hidden" id="lang" name="lang" />
+      <input type="hidden" id="id"    name="id"    />
+      <input type="hidden" id="token" name="token" />
+      <input type="hidden" id="em"    name="em"    />
 
-    <label>Strasse</label>
-    <input type="text" id="strasse" name="strasse" />
+      <label for="glaeubiger">Gläubiger-Nr.</label>
+      <input type="text" id="glaeubiger" name="glaeubiger" readonly required />
 
-    <label>Nr.</label>
-    <input type="text" id="hausnummer" name="hausnummer" />
+      <label for="firstname">Vorname</label>
+      <input type="text" id="firstname" name="firstname" required readonly />
 
-    <label>PLZ</label>
-    <input type="text" id="plz" name="plz" />
+      <label for="name">Nachname</label>
+      <input type="text" id="name" name="name" required readonly />
 
-    <label>Ort</label>
-    <input type="text" id="ort" name="ort" />
+      <div class="row">
+        <div>
+          <label for="strasse">Strasse</label>
+          <input type="text" id="strasse" name="strasse" required />
+        </div>
+        <div style="max-width:180px;">
+          <label for="hausnummer">Nr.</label>
+          <input type="text" id="hausnummer" name="hausnummer" required />
+        </div>
+      </div>
 
-    <label>Land</label>
-    <input type="text" id="country" name="country" />
+      <div class="row">
+        <div style="max-width:200px;">
+          <label for="plz">PLZ</label>
+          <input type="text" id="plz" name="plz" required />
+        </div>
+        <div>
+          <label for="ort">Ort</label>
+          <input type="text" id="ort" name="ort" required />
+        </div>
+      </div>
 
-    <button type="submit">Absenden</button>
-  </form>
-</div>
+      <label for="country">Land</label>
+      <input type="text" id="country" name="country" required />
 
-<script>
-function qs(name) {
-  const p = new URLSearchParams(location.search);
-  return p.get(name) || "";
-}
+      <button type="submit" id="btn-submit">Absenden</button>
+    </form>
+  </div>
 
-function safeSet(id, value) {
-  if (value && String(value).trim() !== "") {
-    document.getElementById(id).value = value;
-  }
-}
+  <script>
+    function qs(name) {
+      const p = new URLSearchParams(location.search);
+      return p.get(name) || "";
+    }
 
-(async function init() {
-  const id = qs('id');
-  const token = qs('token');
-  const em = qs('em');
-  const email = atob(em.replace(/-/g,'+').replace(/_/g,'/'));
+    function b64urlDecode(str) {
+      let s = str.replace(/-/g,'+').replace(/_/g,'/');
+      while (s.length % 4 !== 0) s += '=';
+      return decodeURIComponent(escape(atob(s)));
+    }
 
-  if (!id || !token || !em) {
-    document.getElementById('gate-error').textContent = "Link ungültig oder unvollständig.";
-    document.getElementById('gate-error').classList.remove('hidden');
-    return;
-  }
+    function safeSet(id, value) {
+      if (value && String(value).trim() !== "") {
+        document.getElementById(id).value = value;
+      }
+    }
 
-  safeSet('email', email);
-  safeSet('id', id);
-  safeSet('token', token);
-  safeSet('em', em);
+    (async function init() {
+      const id = qs('id');
+      const token = qs('token');
+      const em = qs('em');
+      const email = b64urlDecode(em).trim();
 
-  try {
-    const resp = await fetch('/.netlify/functions/get_contact?email=' + encodeURIComponent(email));
-    if (!resp.ok) throw new Error();
-    const data = await resp.json();
+      safeSet('email', email);
+      safeSet('id', id);
+      safeSet('token', token);
+      safeSet('em', em);
 
-    // Fallback: wenn glaeubiger leer → ID aus URL einsetzen
-    const glaeubigerVal = (data.glaeubiger || data['gläubiger'] || "").trim();
-    safeSet('glaeubiger', glaeubigerVal || id);
+      try {
+        const resp = await fetch('/.netlify/functions/get_contact?id=' + encodeURIComponent(email));
+        const data = await resp.json();
 
-    ['firstname','name','strasse','hausnummer','plz','ort','country'].forEach(k => safeSet(k, data[k]));
+        let glaeubiger = data.glaeubiger || data["gläubiger"] || "";
+        if (!glaeubiger && id) glaeubiger = id; // Fallback hier
 
-    document.getElementById('gate-ok').textContent = "Link geprüft – Formular freigeschaltet.";
-    document.getElementById('gate-ok').classList.remove('hidden');
-    document.getElementById('verify-form').classList.remove('hidden');
-  } catch (e) {
-    document.getElementById('gate-error').textContent = "Verifizierung fehlgeschlagen.";
-    document.getElementById('gate-error').classList.remove('hidden');
-  }
-})();
-</script>
+        safeSet('glaeubiger', glaeubiger);
+        ['firstname','name','strasse','hausnummer','plz','ort','country'].forEach(k => safeSet(k, data[k]));
+
+        document.getElementById('verify-form').classList.remove('hidden');
+      } catch (e) {
+        document.getElementById('gate-error').textContent = "Fehler beim Laden der Daten.";
+        document.getElementById('gate-error').classList.remove('hidden');
+      }
+    })();
+  </script>
 </body>
 </html>
