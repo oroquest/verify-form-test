@@ -1,14 +1,36 @@
 // netlify/functions/verify_check.js
 // Prüft, ob ein Verifizierungs-Token gültig ist (existiert, nicht abgelaufen, nicht verbraucht).
-// Hinweis: nutzt das globale fetch (Node 18/20). KEIN node-fetch nötig.
+// Nutzt globales fetch (Node 18/20). Kein node-fetch nötig.
 
 const MJ_BASE = "https://api.mailjet.com/v3/REST";
 const { MJ_APIKEY_PUBLIC, MJ_APIKEY_PRIVATE } = process.env;
 
+// Alias/Normalisierung für Property-Namen (Umlaute, ß, Case)
+function aliasKey(name = "") {
+  let s = String(name).toLowerCase();
+  // explizite deutsche Umlaute/ß -> ASCII
+  s = s
+    .replace(/ä/g, "ae")
+    .replace(/ö/g, "oe")
+    .replace(/ü/g, "ue")
+    .replace(/ß/g, "ss");
+  // evtl. restliche diakritische Zeichen entfernen (sicherheitsnetz)
+  s = s.normalize("NFKD").replace(/[\u0300-\u036f]/g, "");
+  return s;
+}
+
 // Vereinheitlichte Auslese des Ablaufdatums
-function normalizeExpiry(props) {
-  const keys = ["Token_verify_expiry", "token_verify_expiry", "token_expiry", "Token_expiry"];
-  for (const k of keys) if (props && props[k]) return props[k];
+function normalizeExpiry(propsRaw, propsAlias) {
+  const keys = [
+    "Token_verify_expiry",
+    "token_verify_expiry",
+    "token_expiry",
+    "Token_expiry"
+  ];
+  for (const k of keys) if (propsRaw && propsRaw[k]) return propsRaw[k];
+  // alias-Variante (falls jemand aliasierte Namen verwendet)
+  const aliasKeys = keys.map(aliasKey);
+  for (const ak of aliasKeys) if (propsAlias && propsAlias[ak]) return propsAlias[ak];
   return "";
 }
 
@@ -50,24 +72,42 @@ exports.handler = async (event) => {
       return { statusCode: 502, body: `Mailjet contactdata fetch failed: ${err}` };
     }
     const d = await r2.json();
-    const props = {};
-    for (const p of (d.Data?.[0]?.Data || [])) props[p.Name] = p.Value;
+
+    // propsRaw: Original-Namen, propsAlias: normalisierte Aliase (z.B. gläubiger -> glaeubiger)
+    const propsRaw = {};
+    const propsAlias = {};
+    for (const p of (d.Data?.[0]?.Data || [])) {
+      propsRaw[p.Name] = p.Value;
+      propsAlias[aliasKey(p.Name)] = p.Value;
+    }
 
     // ---- Prüfungen ----
-    if ((props["glaeubiger"] || props["Glaeubiger"] || "").toString() !== id.toString()) {
+
+    // ID passend? (gläubiger / glaeubiger akzeptieren)
+    const idFromProps =
+      propsRaw["glaeubiger"] ??
+      propsRaw["Glaeubiger"] ??
+      propsRaw["gläubiger"] ??
+      propsRaw["Gläubiger"] ??
+      propsAlias["glaeubiger"]; // alias erfasst beide Varianten
+    if (String(idFromProps ?? "") !== id.toString()) {
       return { statusCode: 400, body: "ID does not match" };
     }
 
-    const stored = (props["token_verify"] || "").toString();
+    // Token passend?
+    const stored =
+      (propsRaw["token_verify"] ?? propsAlias["token_verify"] ?? "").toString();
     if (!stored || stored !== token) {
       return { statusCode: 400, body: "Invalid token" };
     }
 
-    if (props["token_verify_used_at"]) {
+    // Bereits verbraucht?
+    if (propsRaw["token_verify_used_at"] || propsAlias["token_verify_used_at"]) {
       return { statusCode: 409, body: "Token already used" };
     }
 
-    const expiryRaw = normalizeExpiry(props);
+    // Abgelaufen?
+    const expiryRaw = normalizeExpiry(propsRaw, propsAlias);
     if (expiryRaw) {
       const now = new Date();
       const exp = new Date(expiryRaw);
@@ -76,6 +116,7 @@ exports.handler = async (event) => {
       }
     }
 
+    // Alles ok
     return { statusCode: 200, body: "OK" };
 
   } catch (err) {
