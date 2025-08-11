@@ -1,103 +1,116 @@
 
-// script.js
-// Combined contact loading and soft verification logic
+let currentLang = "de";
 
-(function() {
-  // Utility to parse query params
-  function getQS() {
-    const p = new URLSearchParams(location.search);
-    return {
-      lang: p.get("lang") || "de",
-      id: p.get("id") || "",
-      token: p.get("token") || "",
-      em: p.get("em") || ""
-    };
-  }
-
-  // Base64URL decode function
-  function base64UrlDecode(str) {
-    try {
-      str = str.replace(/-/g, '+').replace(/_/g, '/');
-      const pad = str.length % 4;
-      if (pad) {
-        str += '='.repeat(4 - pad);
-      }
-      return decodeURIComponent(escape(atob(str)));
-    } catch (e) {
-      console.error("Base64URL decode failed:", e);
-      return "";
+function setLanguage(lang) {
+  currentLang = lang;
+  const i18n = {
+    de: {
+      title: "Bitte bestätigen Sie Ihre Daten",
+      glaeubiger: "Gläubiger-Nr.",
+      token: "Token",
+      email: "E-Mail-Adresse",
+      adresse: "Aktuelle Adresse",
+      confirm1: "Ich bestätige, dass die angegebenen Daten korrekt sind.",
+      confirm2: "Ich stimme der Verarbeitung meiner Daten im Rahmen des Konkursverfahrens der SIKURA Leben AG. i.L. gemäss DSGVO zu.",
+      submit: "Absenden"
+    },
+    it: {
+      title: "Si prega di confermare i propri dati",
+      glaeubiger: "Numero del creditore",
+      token: "Token",
+      email: "Indirizzo e-mail",
+      adresse: "Indirizzo attuale",
+      confirm1: "Confermo che i dati forniti sono corretti.",
+      confirm2: "Acconsento al trattamento dei miei dati nell'ambito della procedura fallimentare di SIKURA Vita SA i.L. ai sensi del GDPR.",
+      submit: "Invia"
+    },
+    en: {
+      title: "Please confirm your information",
+      glaeubiger: "Creditor No.",
+      token: "Token",
+      email: "Email address",
+      adresse: "Current Address",
+      confirm1: "I confirm that the provided data is correct.",
+      confirm2: "I consent to the processing of my data in the context of the bankruptcy proceedings of SIKURA Life AG i.L. in accordance with GDPR.",
+      submit: "Submit"
     }
-  }
+  };
 
-  // Load contact data
-  async function loadContact(params) {
-    try {
-      const decodedEmail = base64UrlDecode(params.em);
-      if (!decodedEmail) {
-        console.warn("[contact] No email decoded from URL");
-        return;
-      }
-      const url = `/.netlify/functions/get_contact?email=${encodeURIComponent(decodedEmail)}`;
-      const resp = await fetch(url, { method: "GET", cache: "no-store" });
-      if (resp.ok) {
-        const data = await resp.json();
-        console.info("[contact] Data received:", data);
-        // Fill form fields by name if data keys match
-        for (const [key, value] of Object.entries(data)) {
-          const el = document.querySelector(`[name="${key}"]`);
-          if (el) {
-            el.value = value;
-          }
-        }
-      } else {
-        console.warn("[contact] get_contact failed:", resp.status);
-      }
-    } catch (err) {
-      console.error("[contact] Error:", err);
-    }
-  }
-
-  // Soft verify check (non-blocking)
-  async function softVerifyLink(params) {
-    const FAIL_TEXTS = new Set([
-      "❌ Ungültiger oder abgelaufener Verifizierungslink.",
-      "❌ Link di verifica non valido o scaduto.",
-      "❌ Invalid or expired verification link.",
-      "Ungültiger Link oder abgelaufener Zugriff. Bitte verwenden Sie den offiziellen Zugang."
-    ]);
-    // Override alert to suppress known failure messages
-    const _alert = window.alert;
-    window.alert = function(msg) {
-      try {
-        if (typeof msg === "string" && FAIL_TEXTS.has(msg.trim())) {
-          console.warn("[soft-verify] suppressed alert:", msg);
-          return;
-        }
-      } catch (_) {}
-      return _alert.apply(window, arguments);
-    };
-    try {
-      const qs = new URLSearchParams(params).toString();
-      const resp = await fetch(`/.netlify/functions/verify_check?${qs}`, {
-        method: "GET",
-        credentials: "omit",
-        cache: "no-store"
-      });
-      if (!resp.ok) {
-        console.warn("[soft-verify] verify_check soft-fail:", resp.status);
-      } else {
-        console.info("[soft-verify] verify_check OK");
-      }
-    } catch (e) {
-      console.warn("[soft-verify] verify_check error:", e);
-    }
-  }
-
-  // On DOM ready, run both tasks
-  document.addEventListener("DOMContentLoaded", () => {
-    const params = getQS();
-    loadContact(params);
-    softVerifyLink(params);
+  document.querySelectorAll("[data-i18n]").forEach(el => {
+    const key = el.getAttribute("data-i18n");
+    el.textContent = i18n[lang][key] || el.textContent;
   });
+}
 
-})();
+document.addEventListener("DOMContentLoaded", async () => {
+  const params = new URLSearchParams(window.location.search);
+  const glaeubigerId = params.get("id") || "";
+  const token = params.get("token") || "";
+
+  document.getElementById("glaeubiger").value = glaeubigerId;
+  document.getElementById("token").value = token;
+
+  try {
+    const response = await fetch(`/.netlify/functions/verify?id=${glaeubigerId}&token=${token}`);
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(result.error || "Ungültiger Zugriff");
+    }
+
+    document.getElementById("name").value = result.name || "";
+    document.getElementById("adresse").value = result.adresse || "";
+
+    setLanguage(currentLang);
+
+  } catch (error) {
+    alert("Ungültiger Link oder abgelaufener Zugriff. Bitte verwenden Sie den offiziellen Zugang.");
+    const form = document.getElementById("verify-form");
+    if (form) form.style.display = "none";
+  }
+});
+
+document.getElementById("verify-form").addEventListener("submit", function(event) {
+  const email = document.getElementById("email").value.trim();
+  const adresse = document.getElementById("adresse").value.trim();
+  const confirm = document.getElementById("confirm").checked;
+  const privacy = document.getElementById("privacy").checked;
+
+  const blockedDomains = ["mailrez.com", "yopmail.com", "tempmail.com", "sharklasers.com"];
+  const emailDomain = email.split("@")[1]?.toLowerCase() || "";
+
+  if (blockedDomains.includes(emailDomain)) {
+    alert("Bitte verwenden Sie eine gültige, persönliche E-Mail-Adresse.");
+    event.preventDefault();
+    return;
+  }
+
+  const messages = {
+    de: {
+      email: "Bitte geben Sie eine gültige E-Mail-Adresse ein.",
+      adresse: "Bitte geben Sie Ihre Adresse ein.",
+      confirm: "Bitte bestätigen Sie die Richtigkeit der Angaben.",
+      privacy: "Bitte stimmen Sie der Datenschutzvereinbarung zu."
+    },
+    en: {
+      email: "Please enter a valid email address.",
+      adresse: "Please enter your address.",
+      confirm: "Please confirm the accuracy of your information.",
+      privacy: "Please accept the privacy agreement."
+    },
+    it: {
+      email: "Si prega di inserire un indirizzo e-mail valido.",
+      adresse: "Si prega di inserire l'indirizzo.",
+      confirm: "Confermi la correttezza delle informazioni.",
+      privacy: "Accetti l'informativa sulla privacy."
+    }
+  };
+
+  const m = messages[currentLang];
+  const regex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+
+  if (!regex.test(email)) { alert(m.email); event.preventDefault(); return; }
+  if (!adresse) { alert(m.adresse); event.preventDefault(); return; }
+  if (!confirm) { alert(m.confirm); event.preventDefault(); return; }
+  if (!privacy) { alert(m.privacy); event.preventDefault(); return; }
+});
