@@ -30,6 +30,7 @@
 </head>
 <body>
   <div class="container">
+    <!-- Sprache & Logo -->
     <div class="language-switcher">
       <select id="language">
         <option value="de">Deutsch</option>
@@ -37,8 +38,8 @@
         <option value="en">English</option>
       </select>
     </div>
-
     <img src="siku_logo.png" alt="Sikura Life" class="logo" />
+
     <h2 id="title">Bitte bestätigen Sie Ihre Adresse</h2>
     <p id="intro" class="hint">Felder sind vorbefüllt und können bei Bedarf aktualisiert werden.</p>
 
@@ -47,6 +48,7 @@
     <div id="gate-error" class="field-error hidden" role="alert" aria-live="polite"></div>
     <div id="gate-ok" class="ok hidden"></div>
 
+    <!-- Formular -->
     <form id="verify-form" class="hidden" method="POST" action="/.netlify/functions/verify_submit" novalidate>
       <!-- Hidden: email/lang/id/token/em -->
       <input type="hidden" id="email" name="email" />
@@ -55,192 +57,131 @@
       <input type="hidden" id="token" name="token" />
       <input type="hidden" id="em"    name="em"    />
 
-      <label for="glaeubiger" id="lbl-glaeubiger">Gläubiger‑Nr.</label>
+      <label for="glaeubiger">Gläubiger-Nr.</label>
       <input type="text" id="glaeubiger" name="glaeubiger" readonly required />
-      <div class="hint" id="hint-glaeubiger"></div>
-      <div class="field-error" id="err-glaeubiger"></div>
 
-      <label for="firstname" id="lbl-firstname">Vorname</label>
+      <label for="firstname">Vorname</label>
       <input type="text" id="firstname" name="firstname" required readonly />
-      <div class="hint" id="hint-firstname"></div>
-      <div class="field-error" id="err-firstname"></div>
 
-      <label for="name" id="lbl-name">Nachname</label>
+      <label for="name">Nachname</label>
       <input type="text" id="name" name="name" required readonly />
-      <div class="hint" id="hint-name"></div>
-      <div class="field-error" id="err-name"></div>
 
       <div class="row">
         <div>
-          <label for="strasse" id="lbl-strasse">Strasse</label>
+          <label for="strasse">Strasse</label>
           <input type="text" id="strasse" name="strasse" required />
-          <div class="hint" id="hint-strasse"></div>
-          <div class="field-error" id="err-strasse"></div>
         </div>
         <div style="max-width:180px;">
-          <label for="hausnummer" id="lbl-hausnummer">Nr.</label>
+          <label for="hausnummer">Nr.</label>
           <input type="text" id="hausnummer" name="hausnummer" required />
-          <div class="hint" id="hint-hausnummer"></div>
-          <div class="field-error" id="err-hausnummer"></div>
         </div>
       </div>
 
       <div class="row">
         <div style="max-width:200px;">
-          <label for="plz" id="lbl-plz">PLZ</label>
-          <input type="text" id="plz" name="plz" required inputmode="numeric" pattern="\d*" autocomplete="postal-code" />
-          <div class="hint" id="hint-plz"></div>
-          <div class="field-error" id="err-plz"></div>
+          <label for="plz">PLZ</label>
+          <input type="text" id="plz" name="plz" required />
         </div>
         <div>
-          <label for="ort" id="lbl-ort">Ort</label>
+          <label for="ort">Ort</label>
           <input type="text" id="ort" name="ort" required />
-          <div class="hint" id="hint-ort"></div>
-          <div class="field-error" id="err-ort"></div>
         </div>
       </div>
 
-      <label for="country" id="lbl-country">Land</label>
+      <label for="country">Land</label>
       <input type="text" id="country" name="country" required />
-      <div class="hint" id="hint-country"></div>
-      <div class="field-error" id="err-country"></div>
 
       <div class="checkbox-group">
         <label class="checkbox-line">
           <input type="checkbox" id="confirm" name="confirm" required />
-          <span id="txt-confirm">Ich bestätige, dass die angegebenen Daten korrekt sind.</span>
+          <span>Ich bestätige, dass die angegebenen Daten korrekt sind.</span>
         </label>
-        <div class="hint" id="hint-confirm"></div>
-        <div class="field-error" id="err-confirm"></div>
       </div>
       <div class="checkbox-group">
         <label class="checkbox-line">
           <input type="checkbox" id="privacy" name="privacy" required />
-          <span id="txt-privacy">Ich stimme der Verarbeitung meiner Daten gemäss DSGVO zu.</span>
+          <span>Ich stimme der Verarbeitung meiner Daten gemäss DSGVO zu.</span>
         </label>
-        <div class="hint" id="hint-privacy"></div>
-        <div class="field-error" id="err-privacy"></div>
-      </div>
-
-      <!-- Link to privacy (inside form, language-aware) -->
-      <div class="hint linkline">
-        <a id="privacy-link" href="privacy.html?lang=de" target="_blank" rel="noopener">Datenschutzhinweise</a>
       </div>
 
       <button type="submit" id="btn-submit">Absenden</button>
-      <div class="hint" id="hint-expiry">Hinweis: Der Bestätigungslink ist aus Sicherheitsgründen 7 Tage gültig.</div>
     </form>
   </div>
 
   <script>
-    const i18n = {
-      de: {
-        title: "Bitte bestätigen Sie Ihre Adresse",
-        intro: "Felder sind vorbefüllt und können bei Bedarf aktualisiert werden.",
-        ctx: "Bitte geben Sie Ihre vollständigen und korrekten Adressdaten ein.",
-        glaeubiger: "Gläubiger‑Nr.",
-        firstname: "Vorname",
-        name: "Nachname",
-        strasse: "Strasse",
-        hausnummer: "Nr.",
-        plz: "PLZ",
-        ort: "Ort",
-        country: "Land",
-        hintGlaeubiger: "Nummer des Gläubigers.",
-        hintFirst: "Vorname gemäss Personalausweis.",
-        hintName: "Nachname gemäss Personalausweis.",
-        hintStrasse: "Strassenname gemäss offizieller Adresse ohne Hausnummer.",
-        hintHausnummer: "Hausnummer gemäss offizieller Adresse.",
-        hintZIP: "Postleitzahl gemäss Land (CH/LI = 4 Ziffern, DE/IT = 5 Ziffern).",
-        hintOrt: "Ort gemäss offizieller Adresse.",
-        hintCountry: "Land gemäss offizieller Adresse.",
-        confirm: "Ich bestätige, dass die angegebenen Daten korrekt sind.",
-        privacy: "Ich stimme der Verarbeitung meiner Daten gemäss DSGVO zu.",
-        privacyLink: "Datenschutzhinweise",
-        submit: "Absenden",
-        errRequired: "Pflichtfeld – bitte ausfüllen.",
-        errDigits: "Es sind nur Ziffern erlaubt.",
-        errConfirm: "Bitte bestätigen Sie die Richtigkeit der Angaben.",
-        errPrivacy: "Bitte stimmen Sie der DSGVO‑Verarbeitung zu.",
-        errZIPLenCH: "PLZ muss 4 Ziffern haben (CH).",
-        errZIPLenLI: "PLZ muss 4 Ziffern haben (LI).",
-        errZIPLenIT: "PLZ muss 5 Ziffern haben (IT).",
-        errZIPLenDE: "PLZ muss 5 Ziffern haben (DE).",
-        expiry: "Hinweis: Der Bestätigungslink ist aus Sicherheitsgründen 7 Tage gültig.",
-        gateFail: "Verifizierung fehlgeschlagen. Der Link ist ungültig oder abgelaufen.",
-        gateOk: "Link geprüft – Formular freigeschaltet.",
-        errInvalidToken: "Link ungültig oder bereits verwendet.",
-        errTokenExpired: "Link abgelaufen.",
-        errTokenUsed: "Link bereits verwendet.",
-        errGeneric: "Es ist ein Fehler aufgetreten. Bitte versuchen Sie es später erneut."
-      },
-      it: {
-        title: "Per favore conferma il tuo indirizzo",
-        intro: "I campi sono precompilati e possono essere aggiornati se necessario.",
-        ctx: "Si prega di inserire i dati completi e corretti dell'indirizzo.",
-        glaeubiger: "Numero del creditore",
-        firstname: "Nome",
-        name: "Cognome",
-        strasse: "Via",
-        hausnummer: "Nr.",
-        plz: "CAP",
-        ort: "Città",
-        country: "Paese",
-        hintGlaeubiger: "Numero del creditore come da comunicazione.",
-        hintFirst: "Nome secondo la carta d'identità.",
-        hintName: "Cognome secondo la carta d'identità.",
-        hintStrasse: "Nome della via senza numero civico.",
-        hintHausnummer: "Numero civico secondo l'indirizzo ufficiale.",
-        hintZIP: "CAP secondo il paese (CH/LI = 4 cifre, DE/IT = 5 cifre).",
-        hintOrt: "Località secondo l'indirizzo ufficiale.",
-        hintCountry: "Paese secondo l'indirizzo ufficiale.",
-        confirm: "Confermo che i dati forniti sono corretti.",
-        privacy: "Acconsento al trattamento dei miei dati secondo il GDPR.",
-        privacyLink: "Informativa privacy",
-        submit: "Invia",
-        errRequired: "Campo obbligatorio – compila per favore.",
-        errDigits: "Sono consentite solo cifre.",
-        errConfirm: "Conferma che i dati sono corretti.",
-        errPrivacy: "Fornisci il consenso GDPR.",
-        errZIPLenCH: "Il CAP deve avere 4 cifre (CH).",
-        errZIPLenLI: "Il CAP deve avere 4 cifre (LI).",
-        errZIPLenIT: "Il CAP deve avere 5 cifre (IT).",
-        errZIPLenDE: "Il CAP deve avere 5 cifre (DE).",
-        expiry: "Nota: Per motivi di sicurezza il link è valido per 7 giorni.",
-        gateFail: "Verifica non riuscita. Il link non è valido o è scaduto.",
-        gateOk: "Link verificato – modulo abilitato.",
-        errInvalidToken: "Link non valido o già utilizzato.",
-        errTokenExpired: "Link scaduto.",
-        errTokenUsed: "Link già utilizzato.",
-        errGeneric: "Si è verificato un errore. Riprova più tardi."
-      },
-      en: {
-        title: "Please confirm your address",
-        intro: "Fields are pre-filled and can be updated if needed.",
-        ctx: "Please enter your complete and correct address details.",
-        glaeubiger: "Creditor No.",
-        firstname: "First name",
-        name: "Last name",
-        strasse: "Street",
-        hausnummer: "No.",
-        plz: "ZIP",
-        ort: "City/Town",
-        country: "Country",
-        hintGlaeubiger: "Creditor number as stated in the letter.",
-        hintFirst: "First name according to identity card.",
-        hintName: "Last name according to identity card.",
-        hintStrasse: "Street name without house number.",
-        hintHausnummer: "House number as per official address.",
-        hintZIP: "ZIP code according to country (CH/LI = 4 digits, DE/IT = 5 digits).",
-        hintOrt: "City/Town as per official address.",
-        hintCountry: "Country as per official address.",
-        confirm: "I confirm that the information provided is correct.",
-        privacy: "I consent to the processing of my data under GDPR.",
-        privacyLink: "Privacy notice",
-        submit: "Submit",
-        errRequired: "Required field — please fill in.",
-        errDigits: "Digits only.",
-        errConfirm: "Please confirm the information is correct.",
-        errPrivacy: "Please provide GDPR consent.",
-        errZIPLenCH: "ZIP must be 4 digits (CH).",
-        errZIPLenLI: "ZIP must be 4 digits (LI).
+    function qs(name) {
+      const p = new URLSearchParams(location.search);
+      return p.get(name) || "";
+    }
+
+    function b64urlDecode(str) {
+      if (!str) return "";
+      let clean = str.trim().replace(/[^A-Za-z0-9\-_]/g, ""); // Sonderzeichen raus
+      try {
+        let s = clean.replace(/-/g,'+').replace(/_/g,'/');
+        while (s.length % 4 !== 0) s += '=';
+        return decodeURIComponent(escape(atob(s)));
+      } catch { return ""; }
+    }
+
+    function safeSet(id, value) {
+      if (value !== undefined && value !== null && String(value).trim() !== "") {
+        document.getElementById(id).value = value;
+      }
+    }
+
+    (async function init() {
+      const id = qs('id');
+      const token = qs('token');
+      const em = qs('em');
+
+      const email = b64urlDecode(em).trim();
+      safeSet('email', email);
+      safeSet('id', id);
+      safeSet('token', token);
+      safeSet('em', em);
+
+      let data = null;
+      try {
+        let resp = await fetch('/.netlify/functions/get_contact?email=' + encodeURIComponent(email));
+        if (resp.ok) {
+          data = await resp.json();
+        }
+        if (!data || !Object.keys(data).length) {
+          // Fallback
+          resp = await fetch('/.netlify/functions/get_contact?id=' + encodeURIComponent(id));
+          if (resp.ok) data = await resp.json();
+        }
+      } catch (e) {}
+
+      if (!data || !Object.keys(data).length) {
+        document.getElementById('gate-error').textContent = "Verifizierung fehlgeschlagen – keine Daten.";
+        document.getElementById('gate-error').classList.remove('hidden');
+        return;
+      }
+
+      const getVal = (obj, keys) => {
+        for (const k of keys) {
+          if (obj[k] !== undefined && obj[k] !== null && String(obj[k]).trim() !== "") {
+            return obj[k];
+          }
+        }
+        return "";
+      };
+
+      safeSet('glaeubiger', getVal(data, ['glaeubiger','gläubiger','Glaeubiger']));
+      safeSet('firstname', getVal(data, ['firstname','vorname','Firstname']));
+      safeSet('name', getVal(data, ['name','nachname','Name']));
+      safeSet('strasse', getVal(data, ['strasse','Strasse','street']));
+      safeSet('hausnummer', getVal(data, ['hausnummer','Hausnummer']));
+      safeSet('plz', getVal(data, ['plz','Plz','zip']));
+      safeSet('ort', getVal(data, ['ort','Ort','city']));
+      safeSet('country', getVal(data, ['country','land','Country']));
+
+      document.getElementById('gate-ok').textContent = "Link geprüft – Formular freigeschaltet.";
+      document.getElementById('gate-ok').classList.remove('hidden');
+      document.getElementById('verify-form').classList.remove('hidden');
+    })();
+  </script>
+</body>
+</html>
