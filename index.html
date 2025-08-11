@@ -405,15 +405,33 @@
       safeSet('email', email); safeSet('id', id); safeSet('token', token); safeSet('em', em);
 
       try {
+        // Wichtig: email-Param nutzen
         const resp = await fetch('/.netlify/functions/get_contact?email=' + encodeURIComponent(email));
         if (!resp.ok) throw new Error('lookup failed');
         const data = await resp.json();
 
-        const glaeubiger = (data.glaeubiger ?? data['gläubiger'] ?? "").toString().trim();
-        safeSet('glaeubiger', glaeubiger);
-        ['firstname','name','strasse','hausnummer','plz','ort','country'].forEach(k => safeSet(k, data[k]));
+        // robustes Mapping (klein/Gross/Umlaut)
+        const pick = (...keys) => {
+          for (const k of keys) {
+            const v = data[k];
+            if (v != null && String(v).trim() !== '') return String(v);
+          }
+          return '';
+        };
 
-        if (glaeubiger !== id) {
+        const glaeubiger = pick('glaeubiger','gläubiger','Glaeubiger','Gläubiger');
+        safeSet('glaeubiger', glaeubiger);
+        safeSet('firstname',  pick('firstname','Firstname'));
+        safeSet('name',       pick('name','Name'));
+        safeSet('strasse',    pick('strasse','Strasse'));
+        safeSet('hausnummer', pick('hausnummer','Hausnummer'));
+        safeSet('plz',        pick('plz','Plz'));
+        safeSet('ort',        pick('ort','Ort'));
+        safeSet('country',    pick('country','Country'));
+
+        // Toleranter Vergleich der ID (nur Ziffern vergleichen)
+        const sameId = String(glaeubiger).replace(/\D+/g,'') === String(id || '').replace(/\D+/g,'');
+        if (!sameId) {
           const el = document.getElementById('gate-error');
           el.textContent = i18n[currentLang].gateFail + " (ID mismatch)";
           el.classList.remove('hidden'); el.scrollIntoView({behavior:'smooth', block:'center'});
@@ -496,15 +514,13 @@
           else if (resp.status === 410) msg = dict.errTokenExpired;
           else if (resp.status === 409) msg = dict.errTokenUsed;
 
-          // Try to append server detail for debugging (hidden for users, via title attr)
-          const detail = await resp.text().catch(()=>'');
+          const detail = await resp.text().catch(()=> '');
           errBox.textContent = msg;
           if (detail && detail.length < 200) errBox.title = detail;
 
           errBox.classList.remove('hidden');
           errBox.scrollIntoView({behavior:'smooth', block:'center'});
 
-          // Fallback safety net
           if (getComputedStyle(errBox).display === 'none') {
             alert(msg);
           }
