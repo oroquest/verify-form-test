@@ -1,169 +1,74 @@
 
-// --- Security Patch Start ---
-function isValidEmail(email) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && email.length <= 254;
-}
-function isValidToken(token) {
-  return /^[A-Za-z0-9-_]{20,}$/.test(token);
-}
-// --- Security Patch End ---
-
 // netlify/functions/verify_submit.js
-const MJ_PUBLIC  = process.env.MJ_APIKEY_PUBLIC;
-const MJ_PRIVATE = process.env.MJ_APIKEY_PRIVATE;
-const mjAuth = 'Basic ' + Buffer.from(`${MJ_PUBLIC}:${MJ_PRIVATE}`).toString('base64');
+const crypto = require('crypto');
+const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || 'https://verify.sikuralife.com';
+const VERSION = 'final-2025-08-11-1530Z';
 
-// Feature-Toggles
-const ENFORCE_EXPIRY     = true;   // Token muss vor Ablauf genutzt werden
-const ENFORCE_SINGLE_USE = true;   // Token darf nur 1x genutzt werden
-
-function parseFormBody(event) {
-  const ct = (event.headers['content-type'] || event.headers['Content-Type'] || '').toLowerCase();
-  if (ct.includes('application/json')) {
-    try { return JSON.parse(event.body || '{}'); } catch { return {}; }
-  }
-  try {
-    const params = new URLSearchParams(event.body || '');
-    const obj = {};
-    for (const [k, v] of params.entries()) obj[k] = v;
-    return obj;
-  } catch { return {}; }
+function okHeaders(){
+  return {
+    'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
+    'Vary': 'Origin',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS, GET',
+    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Max-Age': '86400',
+    'X-Function-Version': VERSION,
+    'Content-Type': 'application/json'
+  };
 }
 
-function b64urlDecode(input) {
-  if (!input) return '';
-  let s = String(input).replace(/-/g, '+').replace(/_/g, '/');
-  while (s.length % 4 !== 0) s += '=';
-  try { return Buffer.from(s, 'base64').toString('utf8'); } catch { return ''; }
+function json(status, obj){
+  return { statusCode: status, headers: okHeaders(), body: obj ? JSON.stringify(obj) : '' };
 }
 
-function firstIpFromHeader(xff) {
-  if (!xff) return '';
-  return String(xff).split(',')[0].trim();
+function isValidEmail(email){
+  if (typeof email !== 'string') return false;
+  if (email.length > 254) return false;
+  const re = /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z](2,)$/i;
+  return re.test(email.trim());
 }
-
-function sanitizeUA(ua) {
-  return String(ua || '').replace(/[\u0000-\u001F]+/g, '').trim().slice(0, 255);
+function isValidTokenFmt(token){
+  if (typeof token !== 'string') return false;
+  if (token.length !== 43 && token.length !== 44 && token.length !== 64) return false;
+  return /^[A-Za-z0-9_-]+$/.test(token) || /^[a-f0-9]{64}$/.test(token);
 }
 
 exports.handler = async (event) => {
-  if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
+  if (event.httpMethod === 'OPTIONS') return json(204);
+  if (event.httpMethod === 'GET' && (event.queryStringParameters?.version === 'ping')) {
+    return json(200, { ok: true, version: VERSION });
   }
+  if (event.httpMethod !== 'POST') return json(405, { error: 'method_not_allowed', expect: 'POST' });
 
-  const data = parseFormBody(event);
-  let { id, token, em, email, lang, firstname, name, strasse, hausnummer, plz, ort, country, land } = data;
+  let data;
+  try { data = JSON.parse(event.body || '{}'); } catch { return json(400, { error: 'invalid_json' }); }
 
-  if (!email && em) email = b64urlDecode(em).trim();
-  if (!country && land) country = land;
+  const email = (data.email||'').trim();
+  const token = (data.token||'').trim();
 
-  if (!id || !token || !email) {
-    return { statusCode: 400, body: 'Missing required parameters (id/token/email)' };
-  }
+  if (!email || !token) return json(400, { error: 'missing_email_or_token', version: VERSION });
+  if (!isValidEmail(email) || !isValidTokenFmt(token)) return json(400, { error: 'invalid_email_or_token', version: VERSION });
 
-  // Request-Metadaten
-  const H = event.headers || {};
-  const userAgent = sanitizeUA(H['user-agent'] || H['User-Agent'] || '');
-  const ip =
-    firstIpFromHeader(H['x-forwarded-for'] || H['X-Forwarded-For']) ||
-    H['x-nf-client-connection-ip'] || H['client-ip'] || H['x-real-ip'] || 'unknown';
-  const nowISO = new Date().toISOString();
+  const rec = await getVerificationRecord(email);
+  if (!rec) return json(404, { error: 'not_found', version: VERSION });
+  if (rec.used) return json(410, { error: 'used', version: VERSION });
+  if (typeof rec.expiresAt === 'number' && Date.now() > rec.expiresAt) return json(410, { error: 'expired', version: VERSION });
 
-  try {
-    // 1) Mailjet Contact-Properties holen
-    const r = await fetch(`https://api.mailjet.com/v3/REST/contactdata/${encodeURIComponent(email)}`, {
-      headers: { Authorization: mjAuth }
-    });
-    if (!r.ok) {
-      const t = await r.text();
-      return { statusCode: 502, body: `Mailjet fetch failed: ${t}` };
-    }
-    const json = await r.json();
-    const propsArray = json.Data?.[0]?.Data || [];
-    const theProps = Object.fromEntries(propsArray.map(p => [p.Name, p.Value]));
+  const providedHashHex = crypto.createHash('sha256').update(token).digest('hex');
+  const match = safeEqualHex(providedHashHex, rec.tokenHash);
+  if (!match) return json(401, { error: 'wrong_token', version: VERSION });
 
-    // 2) Pflicht-Validierungen
-    const glaeubigerVal = (theProps['gläubiger'] ?? theProps['glaeubiger'] ?? '').toString().trim();
-    const tokenVerify   = (theProps['token_verify'] || '').toString().trim();
-
-    if (glaeubigerVal !== String(id).trim()) {
-      return { statusCode: 403, body: 'ID mismatch' };
-    }
-    if (!tokenVerify || tokenVerify !== token) {
-      return { statusCode: 403, body: 'Invalid token' };
-    }
-
-    // 3) One-Time-Use pruefen (token_verify_used_at)
-    const tokenUsedAt = (theProps['token_verify_used_at'] || '').toString().trim();
-    if (ENFORCE_SINGLE_USE && tokenUsedAt) {
-      return { statusCode: 409, body: 'Token already used' };
-    }
-
-    // 4) Ablauf pruefen (Token_verify_expiry bevorzugt, Fallbacks moeglich)
-    const expiryRaw =
-      theProps['Token_verify_expiry'] ||
-      theProps['token_verify_expiry'] ||
-      theProps['token_expiry'] ||
-      '';
-    if (ENFORCE_EXPIRY && expiryRaw) {
-      const exp = new Date(expiryRaw);
-      if (isFinite(exp) && exp < new Date()) {
-        return { statusCode: 410, body: 'Token expired' };
-      }
-    }
-
-    // 5) Updates vorbereiten
-    const updates = [];
-    const setIf = (Name, v) => { if (v !== undefined && v !== null && String(v).trim() !== '') updates.push({ Name, Value: String(v) }); };
-    const set    = (Name, v) => { updates.push({ Name, Value: String(v ?? '') }); };
-
-    // Adressfelder: nur befuellte Felder ueberschreiben
-    setIf('firstname',  firstname);
-    setIf('name',       name);
-    setIf('strasse',    strasse);
-    setIf('hausnummer', hausnummer);
-    setIf('plz',        plz);
-    setIf('ort',        ort);
-    setIf('country',    country);
-
-    // Audit (IP, Timestamp, User-Agent)
-    setIf('ip_verify',        ip);
-    setIf('timestamp_verify', nowISO);
-    setIf('agent_verify',     userAgent);
-
-    // One-Time-Use markieren & Token/Ablauf leeren
-    set('token_verify_used_at', nowISO);
-    set('token_verify',  '');
-    set('Token_verify_expiry', '');
-
-    // 6) Mailjet-Update
-    const put = await fetch(`https://api.mailjet.com/v3/REST/contactdata/${encodeURIComponent(email)}`, {
-      method: 'PUT',
-      headers: { Authorization: mjAuth, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ Data: updates })
-    });
-    if (!put.ok) {
-      const t = await put.text();
-      return { statusCode: 502, body: `Mailjet update failed: ${t}` };
-    }
-
-    // 7) Erfolg → je nach Clienttyp JSON oder Redirect
-    const isAjax = /json/i.test(event.headers['accept'] || '') ||
-                   (event.headers['x-requested-with'] || '').toLowerCase() === 'fetch';
-    if (isAjax) {
-      return {
-        statusCode: 200,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ok: true, redirect: 'https://verify.sikuralife.com/danke.html' })
-      };
-    }
-    return {
-      statusCode: 302,
-      headers: { Location: 'https://verify.sikuralife.com/danke.html' },
-      body: ''
-    };
-
-  } catch (err) {
-    return { statusCode: 500, body: `Server error: ${err.message}` };
-  }
+  await markVerificationUsed(email);
+  return json(204);
 };
+
+function safeEqualHex(aHex, bHex){
+  try {
+    const a = Buffer.from(aHex, 'hex'); const b = Buffer.from(bHex, 'hex');
+    if (a.length !== b.length) return false;
+    return crypto.timingSafeEqual(a,b);
+  } catch { return false; }
+}
+
+// Storage placeholders
+async function getVerificationRecord(email){ return null; }
+async function markVerificationUsed(email){ return true; }
