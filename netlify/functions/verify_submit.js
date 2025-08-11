@@ -1,4 +1,4 @@
-// netlify/functions/verify_submit.js — Mailjet storage (no node-fetch needed, uses global fetch in Node 18)
+// netlify/functions/verify_submit.js — Mailjet storage (lowercase property names)
 const crypto = require('crypto');
 
 const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || 'https://verify.sikuralife.com';
@@ -16,7 +16,7 @@ function okHeaders(extra = {}) {
     'Access-Control-Max-Age': '86400',
     'Content-Type': 'application/json',
     'Strict-Transport-Security': 'max-age=31536000',
-    'X-Function-Version': 'final-2025-08-11-v4-mailjet-nofetch'
+    'X-Function-Version': 'final-2025-08-11-v4-mailjet-lowercase'
   }, extra);
 }
 const json = (s, b) => ({ statusCode: s, headers: okHeaders(), body: JSON.stringify(b || {}) });
@@ -61,8 +61,8 @@ async function mjPUT(path, body){
   return j;
 }
 
-// ---- Deine Mailjet-Felder ----
-// Token_verify (str), Token_verify_expiry (datetime ISO), Token_verify_used_at (datetime|null)
+// ---- Deine Mailjet-Felder (lowercase) ----
+// token_verify (str), token_verify_expiry (datetime ISO), token_verify_used_at (datetime|null)
 async function ensureContact(email){
   const found = await mjGET(`/contact?Email=${encodeURIComponent(email)}`);
   if (found?.Count > 0) return found.Data[0].ID;
@@ -84,15 +84,15 @@ const fromIsoToMs = (iso) => { const t = Date.parse(iso); return Number.isFinite
 
 async function getVerificationRecord(email){
   const p = await getContactProps(email);
-  const tokenHash = p.Token_verify ? String(p.Token_verify) : null;
-  const expiryIso = p.Token_verify_expiry ? String(p.Token_verify_expiry) : null;
-  const usedAtIso = p.Token_verify_used_at ? String(p.Token_verify_used_at) : null;
+  const tokenHash = (p.token_verify ?? p.Token_verify) ? String(p.token_verify ?? p.Token_verify) : null;
+  const expiryIso = (p.token_verify_expiry ?? p.Token_verify_expiry) ? String(p.token_verify_expiry ?? p.Token_verify_expiry) : null;
+  const usedAtIso = (p.token_verify_used_at ?? p.Token_verify_used_at) ?? null;
   if (!tokenHash || !expiryIso) return null;
   const expiresAt = fromIsoToMs(expiryIso);
-  return { tokenHash, expiresAt, used: !!usedAtIso };
+  return { tokenHash, expiresAt, used: !!usedAtIso && usedAtIso !== 'null' };
 }
 async function markVerificationUsed(email){
-  await setContactProps(email, { Token_verify_used_at: toUtcIso(Date.now()) });
+  await setContactProps(email, { token_verify_used_at: toUtcIso(Date.now()) });
   return true;
 }
 
@@ -100,7 +100,7 @@ exports.handler = async (event) => {
   try{
     if (event.httpMethod === 'OPTIONS') return json(204);
     const qs = event.queryStringParameters || {};
-    if (event.httpMethod === 'GET' && qs.version==='ping') return json(200, { ok:true, version:'final-2025-08-11-v4-mailjet-nofetch' });
+    if (event.httpMethod === 'GET' && qs.version==='ping') return json(200, { ok:true, version:'final-2025-08-11-v4-mailjet-lowercase' });
 
     // --- Admin seed ---
     if (event.httpMethod === 'POST' && qs.action==='seed') {
@@ -116,9 +116,9 @@ exports.handler = async (event) => {
       const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
       const expiresAtMs = Date.now() + ttlMinutes*60*1000;
       await setContactProps(email, {
-        Token_verify: tokenHash,
-        Token_verify_expiry: toUtcIso(expiresAtMs),
-        Token_verify_used_at: null
+        token_verify: tokenHash,
+        token_verify_expiry: toUtcIso(expiresAtMs),
+        token_verify_used_at: null
       });
       return json(200, { ok:true, email, expiresAt: expiresAtMs });
     }
