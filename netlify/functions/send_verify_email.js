@@ -1,135 +1,88 @@
 // netlify/functions/send_verify_email.js
-// Mailversand ohne Mailjet-SDK – direkte v3.1 REST API via native fetch
-
 exports.handler = async (event) => {
   try {
-    if (event.httpMethod !== "POST") {
-      return { statusCode: 405, body: "Method Not Allowed" };
+    if (event.httpMethod !== 'POST') {
+      return { statusCode: 405, body: '' };
     }
 
-    const env = (k) => {
-      const v = process.env[k];
-      if (!v) throw new Error(`Missing ENV ${k}`);
-      return v;
+    const { email, id, lang, category, token } = JSON.parse(event.body || '{}');
+
+    // 1) Eingaben prüfen
+    if (!email || !id || !token) {
+      return resp(400, { error: 'missing_params' });
+    }
+    const tokenOk = /^[0-9a-f]{64}$/.test(String(token)); // exakt 64-hex (32 Bytes)
+    if (!tokenOk) {
+      return resp(400, { error: 'invalid_token_format' });
+    }
+
+    // 2) Template pro Kategorie wählen (DE/EN/IT je nach Wunsch)
+    const tplMap = {
+      // Beispiel: passe IDs an deine Mailjet-Template-IDs an
+      direct:   { de: process.env.TEMPLATE_DE_DIRECT,   en: process.env.TEMPLATE_EN_DIRECT,   it: process.env.TEMPLATE_EN_DIRECT },
+      lawyer:   { de: process.env.TEMPLATE_DE_LAWYER,   en: process.env.TEMPLATE_EN_LAWYER,   it: process.env.TEMPLATE_EN_LAWYER },
+      fallback: { de: process.env.TEMPLATE_DE_DIRECT,   en: process.env.TEMPLATE_EN_DIRECT,   it: process.env.TEMPLATE_EN_LAWYER },
     };
+    const l = (lang || 'de').toLowerCase();
+    const cat = (category || 'fallback').toLowerCase();
+    const tplByLang = tplMap[cat] || tplMap.fallback;
+    const templateId = tplByLang[l] || tplByLang.de;
 
-    // --- ENV laden & prüfen ---
-    const MJ_PUBLIC  = env("MJ_APIKEY_PUBLIC");
-    const MJ_PRIVATE = env("MJ_APIKEY_PRIVATE");
-    const MAIL_FROM_ADDRESS = env("MAIL_FROM_ADDRESS");
-    const MAIL_FROM_NAME    = env("MAIL_FROM_NAME");
-    const BASE_VERIFY_URL   = env("BASE_VERIFY_URL");   // z.B. https://verify.sikuralife.com
-    const URL_ISSUE_TOKEN   = env("URL_ISSUE_TOKEN");   // z.B. https://verify.sikuralife.com/.netlify/functions/issue_token
-    const TPL_DE_DIRECT     = Number(env("TEMPLATE_DE_DIRECT"));
-    const TPL_DE_LAWYER     = Number(env("TEMPLATE_DE_LAWYER"));
-    const TPL_EN_DIRECT     = Number(env("TEMPLATE_EN_DIRECT"));
-    const TPL_EN_LAWYER     = Number(env("TEMPLATE_EN_LAWYER"));
-
-    const { email, id, lang, category } = JSON.parse(event.body || "{}");
-    if (!email || !id) {
-      return { statusCode: 400, body: JSON.stringify({ error: "Missing email or id" }) };
+    if (!templateId) {
+      return resp(500, { error: 'template_not_configured', cat, lang: l });
     }
 
-    // --- 1) Kontakt holen ---
-    const contactRes = await fetch(
-      `${BASE_VERIFY_URL}/.netlify/functions/get_contact?email=${encodeURIComponent(email)}`
+    // 3) Link NUR aus dem übergebenen Token bauen (kein Neuerzeugen!)
+    const base = process.env.BASE_VERIFY_URL || 'https://verify.sikuralife.com';
+    const emB64url = toB64Url(email.trim().toLowerCase());
+    const verifyUrl = `${base}/?lang=${encodeURIComponent(l)}&id=${encodeURIComponent(id)}&token=${token}&em=${emB64url}`;
+
+    // 4) Mailjet aufrufen
+    const mj = require('node-mailjet').apiConnect(
+      process.env.MJ_APIKEY_PUBLIC,
+      process.env.MJ_APIKEY_PRIVATE
     );
-    if (!contactRes.ok) {
-      const t = await contactRes.text();
-      return { statusCode: 502, body: JSON.stringify({ error: "Failed to get contact", details: t }) };
-    }
 
-    const contact = await contactRes.json();
-    const firstname  = contact.firstname || "";
-    const lastName   = contact.name || contact.Name || ""; // << Nachname aus Mailjet
-    const creditorId = contact.glaeubiger || contact["gläubiger"] || "";
-    const ort        = contact.ort || "";
-    const country    = contact.country || "";
+    // Gläubiger-Nr in der Mail anzeigen: als Variable mitschicken
+    const vars = {
+      url: verifyUrl,
+      id,
+      email: email,
+      token: token,
+    };
 
-    // Sprache/Kategorie bestimmen (mit Fallbacks)
-    const prefLang = (lang || contact.Sprache || "en").toLowerCase();
-    const prefCat  = (category || contact.Category || "").toUpperCase();
-
-    // --- 2) Token ausstellen ---
-    const tokenRes = await fetch(URL_ISSUE_TOKEN, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email, id, lang: prefLang })
-    });
-    if (!tokenRes.ok) {
-      const t = await tokenRes.text();
-      return { statusCode: 502, body: JSON.stringify({ error: "Failed to issue token", details: t }) };
-    }
-    const tokenData = await tokenRes.json();
-    const verifyUrl = tokenData.url;
-    const expiresAt = tokenData.expiresAt;
-
-    // --- 3) Template wählen (DE/EN × DIREKT/ANWALT; IT -> EN-Fallback) ---
-    let templateId;
-    if (prefLang === "de") {
-      templateId = (prefCat === "VN ANWALT") ? TPL_DE_LAWYER : TPL_DE_DIRECT;
-    } else {
-      templateId = (prefCat === "VN ANWALT") ? TPL_EN_LAWYER : TPL_EN_DIRECT;
-    }
-    if (!Number.isFinite(templateId)) {
-      return { statusCode: 500, body: JSON.stringify({ error: "Invalid TemplateID (ENV not set?)" }) };
-    }
-
-    // --- 4) Mailjet v3.1 Send ---
-    const mjAuth = 'Basic ' + Buffer.from(`${MJ_PUBLIC}:${MJ_PRIVATE}`).toString('base64');
-    const subject = (prefLang === "de")
-      ? "Verifizierung Ihrer Daten"
-      : "Verify your contact details";
-
-    const payload = {
+    const request = await mj.post('send', { version: 'v3.1' }).request({
       Messages: [{
-        From: { Email: MAIL_FROM_ADDRESS, Name: MAIL_FROM_NAME },
-        To:   [{ Email: email, Name: `${firstname} ${lastName}`.trim() }],
-        TemplateID: templateId,
-        TemplateLanguage: true, // wichtig für {{var:*}}
-        Subject: subject,
-        Variables: {
-          verify_url:  verifyUrl,
-          expires_at:  expiresAt,
-          firstname:   firstname,
-          creditor_id: creditorId,
-          name:        lastName,   // << füllt {{var:name}}
-          ort:         ort,
-          country:     country
-        }
+        From: { Email: process.env.MAIL_FROM_ADDRESS, Name: process.env.MAIL_FROM_NAME },
+        To:   [{ Email: email }],
+        TemplateID: Number(templateId),
+        TemplateLanguage: true,
+        Variables: vars
       }]
-    };
-
-    const sendRes = await fetch("https://api.mailjet.com/v3.1/send", {
-      method: "POST",
-      headers: { "Authorization": mjAuth, "Content-Type": "application/json" },
-      body: JSON.stringify(payload)
     });
 
-    const sendBody = await sendRes.json().catch(() => ({}));
-    if (!sendRes.ok) {
-      return { statusCode: 502, body: JSON.stringify({ error: "Mailjet send failed", details: sendBody }) };
-    }
-    const status = sendBody?.Messages?.[0]?.Status;
-    if (status !== "success") {
-      return { statusCode: 502, body: JSON.stringify({ error: "Mailjet send failed", status, details: sendBody }) };
-    }
-
-    // --- Erfolg ---
-    return {
-      statusCode: 200,
-      body: JSON.stringify({
-        ok: true,
-        url: verifyUrl,
-        expiresAt,
-        lang: prefLang,
-        category: prefCat,
-        templateId,
-        debug: { firstname, lastName } // optional hilfreich für dich
-      })
-    };
-
-  } catch (err) {
-    return { statusCode: 500, body: JSON.stringify({ errorType: err.name, errorMessage: err.message }) };
+    return resp(200, { templateId, url: verifyUrl });
+  } catch (e) {
+    return resp(500, { error: 'crash', message: String(e && e.message || e) });
   }
 };
+
+// Helpers
+function resp(statusCode, body) {
+  return {
+    statusCode,
+    headers: {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': process.env.ALLOWED_ORIGIN || 'https://verify.sikuralife.com',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS, GET',
+      'Access-Control-Allow-Headers': 'Content-Type',
+      'Access-Control-Max-Age': '86400',
+      'Strict-Transport-Security': 'max-age=31536000'
+    },
+    body: JSON.stringify(body)
+  };
+}
+function toB64Url(str) {
+  const b64 = Buffer.from(str, 'utf8').toString('base64');
+  return b64.replace(/=+$/,'').replace(/\+/g,'-').replace(/\//g,'_');
+}
