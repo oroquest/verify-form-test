@@ -5,7 +5,7 @@
 [[headers]]
   for = "/*"
   [headers.values]
-  Content-Security-Policy = "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; script-src 'self' 'sha256-ds5oHQZ/JIY4IxsGnvarNBEQW/ZUjFo2c9pAu7QTvdw=' 'sha256-FIWHNy0IHfquyx3b3xkb0sxb4tsgWplXzxbenbDK4Qc='; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'; form-action 'self'"
+  Content-Security-Policy-Report-Only = "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'; form-action 'self'"
   X-Content-Type-Options = "nosniff"
   X-Frame-Options = "DENY"
   Referrer-Policy = "no-referrer"
