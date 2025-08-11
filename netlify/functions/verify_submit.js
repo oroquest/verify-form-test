@@ -1,43 +1,68 @@
-// verify_submit.js - Mailjet angepasste Version
-
+// netlify/functions/verify_submit.js — Mailjet storage (no node-fetch needed, uses global fetch in Node 18)
 const crypto = require('crypto');
-const fetch = require('node-fetch');
 
+const ALLOWED_ORIGIN = process.env.ALLOWED_ORIGIN || 'https://verify.sikuralife.com';
+const ADMIN_SEED_SECRET = process.env.ADMIN_SEED_SECRET || null;
 const MJ_KEY = process.env.MJ_APIKEY_PUBLIC;
 const MJ_SECRET = process.env.MJ_APIKEY_PRIVATE;
-const ADMIN_SEED_SECRET = process.env.ADMIN_SEED_SECRET;
+const MJ_BASE = 'https://api.mailjet.com/v3/REST';
 
-// --- Hilfsfunktionen für Mailjet API ---
+function okHeaders(extra = {}) {
+  return Object.assign({
+    'Access-Control-Allow-Origin': ALLOWED_ORIGIN,
+    'Vary': 'Origin',
+    'Access-Control-Allow-Methods': 'POST, OPTIONS, GET',
+    'Access-Control-Allow-Headers': 'Content-Type,x-admin-secret',
+    'Access-Control-Max-Age': '86400',
+    'Content-Type': 'application/json',
+    'Strict-Transport-Security': 'max-age=31536000',
+    'X-Function-Version': 'final-2025-08-11-v4-mailjet-nofetch'
+  }, extra);
+}
+const json = (s, b) => ({ statusCode: s, headers: okHeaders(), body: JSON.stringify(b || {}) });
+
+function isValidEmail(e){ return typeof e==='string' && e.length<=254 && /^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(e.trim()); }
+function isValidTokenFmt(t){
+  if (typeof t!=='string') return false;
+  if (t.length===64 && /^[a-f0-9]{64}$/.test(t)) return true;
+  if ((t.length===43||t.length===44) && /^[A-Za-z0-9_-]+$/.test(t)) return true;
+  return false;
+}
+function timingSafeEqualHex(aHex, bHex){
+  try{ const a=Buffer.from(aHex,'hex'); const b=Buffer.from(bHex,'hex'); if(a.length!==b.length) return false; return crypto.timingSafeEqual(a,b); }
+  catch{ return false; }
+}
+function b64(key, secret){ return Buffer.from(`${key}:${secret}`).toString('base64'); }
+
 async function mjGET(path){
-  const r = await fetch(`https://api.mailjet.com/v3/REST${path}`, {
-    headers: { Authorization: 'Basic ' + Buffer.from(MJ_KEY+':'+MJ_SECRET).toString('base64') }
-  });
-  return r.json();
+  const r = await fetch(`${MJ_BASE}${path}`, { headers: { Authorization: `Basic ${b64(MJ_KEY,MJ_SECRET)}` } });
+  const t = await r.text(); const j = t ? JSON.parse(t) : {};
+  if (!r.ok) throw new Error(`Mailjet GET ${path} ${r.status}: ${t}`);
+  return j;
 }
 async function mjPOST(path, body){
-  const r = await fetch(`https://api.mailjet.com/v3/REST${path}`, {
+  const r = await fetch(`${MJ_BASE}${path}`, {
     method:'POST',
-    headers: {
-      Authorization: 'Basic ' + Buffer.from(MJ_KEY+':'+MJ_SECRET).toString('base64'),
-      'Content-Type':'application/json'
-    },
+    headers: { Authorization: `Basic ${b64(MJ_KEY,MJ_SECRET)}`, 'Content-Type':'application/json' },
     body: JSON.stringify(body)
   });
-  return r.json();
+  const t = await r.text(); const j = t ? JSON.parse(t) : {};
+  if (!r.ok) throw new Error(`Mailjet POST ${path} ${r.status}: ${t}`);
+  return j;
 }
 async function mjPUT(path, body){
-  const r = await fetch(`https://api.mailjet.com/v3/REST${path}`, {
+  const r = await fetch(`${MJ_BASE}${path}`, {
     method:'PUT',
-    headers: {
-      Authorization: 'Basic ' + Buffer.from(MJ_KEY+':'+MJ_SECRET).toString('base64'),
-      'Content-Type':'application/json'
-    },
+    headers: { Authorization: `Basic ${b64(MJ_KEY,MJ_SECRET)}`, 'Content-Type':'application/json' },
     body: JSON.stringify(body)
   });
-  return r.json();
+  const t = await r.text(); const j = t ? JSON.parse(t) : {};
+  if (!r.ok) throw new Error(`Mailjet PUT ${path} ${r.status}: ${t}`);
+  return j;
 }
 
-// --- Storage via Mailjet Contact Properties ---
+// ---- Deine Mailjet-Felder ----
+// Token_verify (str), Token_verify_expiry (datetime ISO), Token_verify_used_at (datetime|null)
 async function ensureContact(email){
   const found = await mjGET(`/contact?Email=${encodeURIComponent(email)}`);
   if (found?.Count > 0) return found.Data[0].ID;
@@ -54,8 +79,8 @@ async function setContactProps(email, props){
   const Data = Object.entries(props).map(([Name,Value])=>({ Name, Value }));
   await mjPUT(`/contactdata/${encodeURIComponent(email)}`, { Data });
 }
-function toUtcIso(ms) { return new Date(ms).toISOString(); }
-function fromIsoToMs(iso) { const t = Date.parse(iso); return Number.isFinite(t) ? t : NaN; }
+const toUtcIso = (ms) => new Date(ms).toISOString();
+const fromIsoToMs = (iso) => { const t = Date.parse(iso); return Number.isFinite(t) ? t : NaN; };
 
 async function getVerificationRecord(email){
   const p = await getContactProps(email);
@@ -71,56 +96,52 @@ async function markVerificationUsed(email){
   return true;
 }
 
-// --- Handler ---
-exports.handler = async function(event, context) {
-  const url = new URL(event.rawUrl || '', 'http://localhost');
-  const qs = Object.fromEntries(url.searchParams.entries());
+exports.handler = async (event) => {
+  try{
+    if (event.httpMethod === 'OPTIONS') return json(204);
+    const qs = event.queryStringParameters || {};
+    if (event.httpMethod === 'GET' && qs.version==='ping') return json(200, { ok:true, version:'final-2025-08-11-v4-mailjet-nofetch' });
 
-  function json(status,obj){ return { statusCode:status, headers:{'Content-Type':'application/json'}, body:JSON.stringify(obj)}; }
-  function isValidEmail(e){ return /^[^@]+@[^@]+\.[^@]+$/.test(e); }
-  function okHeaders(){ return { 'Access-Control-Allow-Origin':'https://verify.sikuralife.com' }; }
+    // --- Admin seed ---
+    if (event.httpMethod === 'POST' && qs.action==='seed') {
+      if (!ADMIN_SEED_SECRET) return json(500, { error:'missing_admin_secret_env' });
+      if (event.headers['x-admin-secret'] !== ADMIN_SEED_SECRET) return json(401, { error:'unauthorized' });
+      let data; try { data = JSON.parse(event.body||'{}'); } catch { return json(400, { error:'invalid_json' }); }
+      const { email, token, ttlMinutes=60 } = data;
+      if (!email || !token) return json(400, { error:'missing email/token' });
+      if (!isValidEmail(email)) return json(400, { error:'invalid_email' });
+      if (!MJ_KEY || !MJ_SECRET) return json(500, { error:'missing_mailjet_keys' });
 
-  // Admin Seed
-  if (event.httpMethod === 'POST' && qs.action === 'seed') {
-    if (!ADMIN_SEED_SECRET) return json(500, { error:'missing_admin_secret_env' });
-    if (event.headers['x-admin-secret'] !== ADMIN_SEED_SECRET) return json(401, { error:'unauthorized' });
+      await ensureContact(email);
+      const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
+      const expiresAtMs = Date.now() + ttlMinutes*60*1000;
+      await setContactProps(email, {
+        Token_verify: tokenHash,
+        Token_verify_expiry: toUtcIso(expiresAtMs),
+        Token_verify_used_at: null
+      });
+      return json(200, { ok:true, email, expiresAt: expiresAtMs });
+    }
+
+    // --- Verify ---
+    if (event.httpMethod !== 'POST') return json(405, { error:'method_not_allowed' });
     let data; try { data = JSON.parse(event.body||'{}'); } catch { return json(400, { error:'invalid_json' }); }
-    const { email, token, ttlMinutes=60 } = data;
-    if (!email || !token) return json(400, { error:'missing email/token' });
-    if (!isValidEmail(email)) return json(400, { error:'invalid_email' });
+    const email = (data.email||'').trim();
+    const token = (data.token||'').trim();
+    if (!isValidEmail(email) || !isValidTokenFmt(token)) return json(400, { error:'invalid_email_or_token' });
     if (!MJ_KEY || !MJ_SECRET) return json(500, { error:'missing_mailjet_keys' });
-
-    await ensureContact(email);
-    const tokenHash = crypto.createHash('sha256').update(token).digest('hex');
-    const expiresAtMs = Date.now() + ttlMinutes*60*1000;
-
-    await setContactProps(email, {
-      Token_verify: tokenHash,
-      Token_verify_expiry: toUtcIso(expiresAtMs),
-      Token_verify_used_at: null
-    });
-
-    return json(200, { ok:true, email, expiresAt: expiresAtMs });
-  }
-
-  // Normal Verify
-  if (event.httpMethod === 'POST') {
-    let data; try { data = JSON.parse(event.body||'{}'); } catch { return json(400, { error:'invalid_json' }); }
-    const { email, token } = data;
-    if (!email || !token) return json(400, { error:'missing email/token' });
-    if (!isValidEmail(email)) return json(400, { error:'invalid_email' });
 
     const rec = await getVerificationRecord(email);
     if (!rec) return json(404, { error:'not_found' });
-    if (rec.used) return json(410, { error:'already_used' });
-    if (Date.now() > rec.expiresAt) return json(410, { error:'expired' });
+    if (rec.used) return json(410, { error:'used' });
+    if (typeof rec.expiresAt==='number' && Date.now()>rec.expiresAt) return json(410, { error:'expired' });
 
     const hashHex = crypto.createHash('sha256').update(token).digest('hex');
-    if (hashHex !== rec.tokenHash) return json(401, { error:'invalid_token' });
+    if (!timingSafeEqualHex(hashHex, rec.tokenHash)) return json(401, { error:'invalid_token' });
 
     await markVerificationUsed(email);
     return { statusCode: 204, headers: okHeaders() };
+  }catch(e){
+    return { statusCode: 500, headers: okHeaders({'X-Debug':'verify_submit_crash'}), body: JSON.stringify({ error:'crash', message:String(e) }) };
   }
-
-  return { statusCode: 405 };
 };
