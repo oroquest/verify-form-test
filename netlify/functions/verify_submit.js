@@ -27,15 +27,27 @@ function b64urlDecode(input) {
   try { return Buffer.from(s, 'base64').toString('utf8'); } catch { return ''; }
 }
 
-
 function sanitizeHeader(s){ return String(s||'').replace(/[\r\n]+/g,' ').slice(0,200); }
 function firstIpFromHeader(xff) {
   if (!xff) return '';
   return String(xff).split(',')[0].trim();
 }
-
 function sanitizeUA(ua) {
   return String(ua || '').replace(/[\u0000-\u001F]+/g, '').trim().slice(0, 255);
+}
+
+// --- Serverseitige Pflichtfeld- & PLZ-Validierung (Helper) ---
+function isFilled(s) { return String(s ?? '').trim().length > 0; }
+function validatePLZ(plz, country) {
+  const p = String(plz || '').trim();
+  const c = String(country || '').trim().toUpperCase();
+  if (!p) return false;
+  // CH/LI → 4-stellig
+  if (c === 'CH' || c === 'LI') return /^\d{4}$/.test(p);
+  // DE/IT → 5-stellig
+  if (c === 'DE' || c === 'IT') return /^\d{5}$/.test(p);
+  // Fallback (konservativ): 4–6 Ziffern
+  return /^\d{4,6}$/.test(p);
 }
 
 exports.handler = async (event) => {
@@ -51,6 +63,15 @@ exports.handler = async (event) => {
 
   if (!id || !token || !email) {
     return { statusCode: 400, body: 'Missing required parameters (id/token/email)' };
+  }
+
+  // --- Serverseitige Pflichtfeld- & PLZ-Validierung (DSGVO/Audit) ---
+  // hausnummer bleibt optional; country kann via "land" gekommen sein (oben gemappt)
+  if (!isFilled(firstname) || !isFilled(name) || !isFilled(strasse) || !isFilled(plz) || !isFilled(ort) || !isFilled(country)) {
+    return { statusCode: 400, body: 'Missing required address fields' };
+  }
+  if (!validatePLZ(plz, country)) {
+    return { statusCode: 400, body: 'Invalid postal code' };
   }
 
   // Request-Metadaten
@@ -74,7 +95,7 @@ exports.handler = async (event) => {
     const propsArray = json.Data?.[0]?.Data || [];
     const theProps = Object.fromEntries(propsArray.map(p => [p.Name, p.Value]));
 
-    // 2) Pflicht-Validierungen
+    // 2) Pflicht-Validierungen (ID/Token)
     const glaeubigerVal = (theProps['gläubiger'] ?? theProps['glaeubiger'] ?? '').toString().trim();
     const tokenVerify   = (theProps['token_verify'] || '').toString().trim();
 
@@ -85,13 +106,13 @@ exports.handler = async (event) => {
       return { statusCode: 403, body: 'Invalid token' };
     }
 
-    // 3) One-Time-Use pruefen (token_verify_used_at)
+    // 3) One-Time-Use prüfen (token_verify_used_at)
     const tokenUsedAt = (theProps['token_verify_used_at'] || '').toString().trim();
     if (ENFORCE_SINGLE_USE && tokenUsedAt) {
       return { statusCode: 409, body: 'Token already used' };
     }
 
-    // 4) Ablauf pruefen (Token_verify_expiry bevorzugt, Fallbacks moeglich)
+    // 4) Ablauf prüfen (Token_verify_expiry bevorzugt, Fallbacks möglich)
     const expiryRaw =
       theProps['Token_verify_expiry'] ||
       theProps['token_verify_expiry'] ||
@@ -109,7 +130,7 @@ exports.handler = async (event) => {
     const setIf = (Name, v) => { if (v !== undefined && v !== null && String(v).trim() !== '') updates.push({ Name, Value: String(v) }); };
     const set    = (Name, v) => { updates.push({ Name, Value: String(v ?? '') }); };
 
-    // Adressfelder: nur befuellte Felder ueberschreiben
+    // Adressfelder: nur befüllte Felder überschreiben
     setIf('firstname',  firstname);
     setIf('name',       name);
     setIf('strasse',    strasse);
