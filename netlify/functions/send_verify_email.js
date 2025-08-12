@@ -24,24 +24,26 @@ exports.handler = async (event) => {
     const TPL_DE_LAWYER     = Number(env("TEMPLATE_DE_LAWYER"));
     const TPL_EN_DIRECT     = Number(env("TEMPLATE_EN_DIRECT"));
     const TPL_EN_LAWYER     = Number(env("TEMPLATE_EN_LAWYER"));
+    const INTERNAL_KEY      = env("GET_CONTACT_INTERNAL_KEY"); // ← NEU: interner Key für get_contact
 
     const { email, id, lang, category } = JSON.parse(event.body || "{}");
     if (!email || !id) {
       return { statusCode: 400, body: JSON.stringify({ error: "Missing email or id" }) };
     }
 
-    // --- 1) Kontakt holen ---
+    // --- 1) Kontakt holen (mit internem Key) ---
     const contactRes = await fetch(
-      `${BASE_VERIFY_URL}/.netlify/functions/get_contact?email=${encodeURIComponent(email)}`
+      `${BASE_VERIFY_URL}/.netlify/functions/get_contact?email=${encodeURIComponent(email)}`,
+      { headers: { "x-internal-key": INTERNAL_KEY } } // ← NEU: Header mitschicken
     );
     if (!contactRes.ok) {
-      const t = await contactRes.text();
+      const t = await contactRes.text().catch(() => "");
       return { statusCode: 502, body: JSON.stringify({ error: "Failed to get contact", details: t }) };
     }
 
     const contact = await contactRes.json();
     const firstname  = contact.firstname || "";
-    const lastName   = contact.name || contact.Name || ""; // << Nachname aus Mailjet
+    const lastName   = contact.name || contact.Name || "";
     const creditorId = contact.glaeubiger || contact["gläubiger"] || "";
     const ort        = contact.ort || "";
     const country    = contact.country || "";
@@ -57,7 +59,7 @@ exports.handler = async (event) => {
       body: JSON.stringify({ email, id, lang: prefLang })
     });
     if (!tokenRes.ok) {
-      const t = await tokenRes.text();
+      const t = await tokenRes.text().catch(() => "");
       return { statusCode: 502, body: JSON.stringify({ error: "Failed to issue token", details: t }) };
     }
     const tokenData = await tokenRes.json();
@@ -77,23 +79,21 @@ exports.handler = async (event) => {
 
     // --- 4) Mailjet v3.1 Send ---
     const mjAuth = 'Basic ' + Buffer.from(`${MJ_PUBLIC}:${MJ_PRIVATE}`).toString('base64');
-    const subject = (prefLang === "de")
-      ? "Verifizierung Ihrer Daten"
-      : "Verify your contact details";
+    const subject = (prefLang === "de") ? "Verifizierung Ihrer Daten" : "Verify your contact details";
 
     const payload = {
       Messages: [{
         From: { Email: MAIL_FROM_ADDRESS, Name: MAIL_FROM_NAME },
         To:   [{ Email: email, Name: `${firstname} ${lastName}`.trim() }],
         TemplateID: templateId,
-        TemplateLanguage: true, // wichtig für {{var:*}}
+        TemplateLanguage: true,
         Subject: subject,
         Variables: {
           verify_url:  verifyUrl,
           expires_at:  expiresAt,
           firstname:   firstname,
           creditor_id: creditorId,
-          name:        lastName,   // << füllt {{var:name}}
+          name:        lastName,
           ort:         ort,
           country:     country
         }
@@ -125,7 +125,7 @@ exports.handler = async (event) => {
         lang: prefLang,
         category: prefCat,
         templateId,
-        debug: { firstname, lastName } // optional hilfreich für dich
+        debug: { firstname, lastName }
       })
     };
 
