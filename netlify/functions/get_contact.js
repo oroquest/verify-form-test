@@ -26,8 +26,23 @@ function hasInternalAuth(headers) {
   return Boolean(INTERNAL_KEY && k && k === INTERNAL_KEY);
 }
 
+// Base64URL -> UTF-8
+function b64urlDecode(input) {
+  if (!input) return '';
+  let s = String(input).replace(/-/g, '+').replace(/_/g, '/');
+  while (s.length % 4 !== 0) s += '=';
+  try { return Buffer.from(s, 'base64').toString('utf8'); } catch { return ''; }
+}
+
+// Query-Param aus URL-String lesen
+function queryFromUrl(url, key) {
+  try { return new URL(url).searchParams.get(key) || ''; }
+  catch { return ''; }
+}
+
 exports.handler = async (event) => {
   const origin = (event.headers && (event.headers.origin || event.headers.Origin)) || undefined;
+  const referer = (event.headers && (event.headers.referer || event.headers.Referer)) || '';
 
   if (event.httpMethod === 'OPTIONS') {
     return { statusCode: 200, headers: cors(origin), body: '' };
@@ -37,10 +52,25 @@ exports.handler = async (event) => {
   }
 
   const p = event.queryStringParameters || {};
-  // In deinem Frontend kommt "email" (oder "id" = email); echte Gläubiger-ID optional separat
-  const email  = String(p.email || p.id || '').trim().toLowerCase();
-  const credId = String(p.glaeubiger || p['gläubiger'] || p.cid || p.idnum || '').trim();
-  const token  = String(p.token || '').trim();
+
+  // ---- Email ermitteln: ?email=... ODER ?em=... ODER aus Referer ----
+  let email = String(p.email || '').trim().toLowerCase();
+  if (!email && p.em) email = b64urlDecode(String(p.em)).trim().toLowerCase();
+  if (!email && referer) {
+    const emRef = queryFromUrl(referer, 'em');
+    const emailRef = queryFromUrl(referer, 'email');
+    if (emRef) email = b64urlDecode(emRef).trim().toLowerCase();
+    else if (emailRef) email = emailRef.trim().toLowerCase();
+  }
+
+  // ---- Token ermitteln: ?token=... ODER aus Referer ----
+  let token = String(p.token || '').trim();
+  if (!token && referer) token = queryFromUrl(referer, 'token') || '';
+
+  // ---- (optionale) Gläubiger-ID: direkt ODER aus Referer ----
+  let credId = String(p.glaeubiger || p['gläubiger'] || p.cid || p.idnum || '').trim();
+  if (!credId && p.id) credId = String(p.id).trim();
+  if (!credId && referer) credId = queryFromUrl(referer, 'id') || '';
 
   if (!email) {
     return { statusCode: 400, headers: cors(origin), body: 'missing email' };
@@ -105,7 +135,7 @@ exports.handler = async (event) => {
       headers: {
         ...cors(origin),
         'Content-Type': 'application/json',
-        'Vary': 'Origin, X-Internal-Key'
+        'Vary': 'Origin, X-Internal-Key, Referer'
       },
       body: JSON.stringify(data)
     };
