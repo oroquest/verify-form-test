@@ -5,9 +5,9 @@
 [[headers]]
   for = "/*"
   [headers.values]
-  Content-Security-Policy = "default-src 'self'; report-uri /csp-violation-report-endpoint/; report-to csp-endpoint"
-  Referrer-Policy = "no-referrer"
+  Content-Security-Policy-Report-Only = "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'; form-action 'self'"
   X-Content-Type-Options = "nosniff"
   X-Frame-Options = "DENY"
+  Referrer-Policy = "no-referrer"
   Permissions-Policy = "geolocation=(), microphone=(), camera=()"
   Strict-Transport-Security = "max-age=31536000; includeSubDomains"
