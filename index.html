@@ -540,5 +540,44 @@
       return true;
     }
   </script>
+  <script>
+(function(){
+  // URL-Parameter holen
+  const qs    = new URLSearchParams(location.search);
+  const em    = qs.get('em')    || '';          // Base64URL der E-Mail
+  const token = qs.get('token') || '';          // Verify-Token
+  const id    = qs.get('id')    || '';          // (optional) Gläubiger-ID
+
+  // Wenn nichts da ist, abbrechen
+  if (!em || !token) {
+    console.warn('verify: em oder token fehlt in der URL');
+    return;
+  }
+
+  // Fetch mit em+token (Gate passiert), optional mit glaeubiger=id
+  const url = `/.netlify/functions/get_contact?em=${encodeURIComponent(em)}&token=${encodeURIComponent(token)}&glaeubiger=${encodeURIComponent(id)}`;
+
+  fetch(url)
+    .then(r => {
+      if (!r.ok) throw new Error('get_contact ' + r.status);
+      return r.json();
+    })
+    .then(d => {
+      // Felder nur setzen, wenn vorhanden
+      const set = (sel, v) => { const el = document.querySelector(sel); if (el && !el.value) el.value = v || ''; };
+      set('#firstname',  d.firstname);
+      set('#name',       d.name);
+      set('#strasse',    d.strasse);
+      set('#hausnummer', d.hausnummer);
+      set('#plz',        d.plz);
+      set('#ort',        d.ort);
+      set('#country',    d.country);
+    })
+    .catch(e => {
+      console.error('Prefill fehlgeschlagen:', e);
+    });
+})();
+</script>
+
 </body>
 </html>
