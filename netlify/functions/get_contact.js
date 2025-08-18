@@ -1,4 +1,3 @@
-// netlify/functions/get_contact.js
 const MJ_PUBLIC  = process.env.MJ_APIKEY_PUBLIC;
 const MJ_PRIVATE = process.env.MJ_APIKEY_PRIVATE;
 const mjAuth = 'Basic ' + Buffer.from(`${MJ_PUBLIC}:${MJ_PRIVATE}`).toString('base64');
@@ -41,7 +40,7 @@ function queryFromUrl(url, key) {
   catch { return ''; }
 }
 
-// ===== optional hilfreiche Picker (unverändert falls schon vorhanden) =====
+// Robuste Property-Suche + ID-Normalisierung
 function pickProp(obj, candidates) {
   if (!obj) return '';
   for (const k of candidates) if (obj[k] != null && obj[k] !== '') return String(obj[k]);
@@ -53,27 +52,29 @@ function pickProp(obj, candidates) {
   return '';
 }
 const normNum = (x) => String(x || '').replace(/\D/g, '').replace(/^0+/, '');
-// ==========================================================================
 
 exports.handler = async (event) => {
-  const hdrs    = event.headers || {};
-  const hdrOrg  = hdrs.origin || hdrs.Origin || '';
-  const hdrRef  = hdrs.referer || hdrs.Referer || '';
-  // **NEU**: Origin aus Referer ableiten, falls kein Origin-Header gesendet wurde
-  const inferredOrigin = hdrOrg || (hdrRef ? (() => { try { return new URL(hdrRef).origin; } catch { return ''; } })() : '');
+  const hdrs   = event.headers || {};
+  const oHdr   = hdrs.origin || hdrs.Origin || '';
+  const rHdr   = hdrs.referer || hdrs.Referer || '';
+  // ✅ NEU: wenn Origin/Referer fehlen → aus Host + Proto ableiten
+  const proto  = (hdrs['x-forwarded-proto'] || hdrs['X-Forwarded-Proto'] || 'https').split(',')[0].trim();
+  const host   = hdrs.host || hdrs.Host || '';
+  const fromRef= (() => { try { return rHdr ? new URL(rHdr).origin : ''; } catch { return ''; } })();
+  const reqOrigin = oHdr || fromRef || (host ? `${proto}://${host}` : '');
 
   if (event.httpMethod === 'OPTIONS') {
-    return { statusCode: 200, headers: cors(inferredOrigin), body: '' };
+    return { statusCode: 200, headers: cors(reqOrigin), body: '' };
   }
   if (event.httpMethod !== 'GET') {
-    return { statusCode: 405, headers: cors(inferredOrigin), body: 'Method Not Allowed' };
+    return { statusCode: 405, headers: cors(reqOrigin), body: 'Method Not Allowed' };
   }
 
   // Public nur für erlaubte Origins (oder mit internem Key)
   const internalOK = hasInternalAuth(hdrs);
-  const originOK   = ALLOW_ORIGINS.has(inferredOrigin || '');
+  const originOK   = ALLOW_ORIGINS.has(reqOrigin || '');
   if (!internalOK && !originOK) {
-    return { statusCode: 403, headers: cors(inferredOrigin), body: 'forbidden' };
+    return { statusCode: 403, headers: cors(reqOrigin), body: 'forbidden' };
   }
 
   const p = event.queryStringParameters || {};
@@ -81,24 +82,24 @@ exports.handler = async (event) => {
   // Email: ?email=... | ?em=... | Referer
   let email = String(p.email || '').trim().toLowerCase();
   if (!email && p.em) email = b64urlDecode(String(p.em)).trim().toLowerCase();
-  if (!email && hdrRef) {
-    const emRef = queryFromUrl(hdrRef, 'em');
-    const emailRef = queryFromUrl(hdrRef, 'email');
+  if (!email && rHdr) {
+    const emRef = queryFromUrl(rHdr, 'em');
+    const emailRef = queryFromUrl(rHdr, 'email');
     if (emRef) email = b64urlDecode(emRef).trim().toLowerCase();
     else if (emailRef) email = emailRef.trim().toLowerCase();
   }
 
   // Token: ?token=... | Referer
   let token = String(p.token || '').trim();
-  if (!token && hdrRef) token = queryFromUrl(hdrRef, 'token') || '';
+  if (!token && rHdr) token = queryFromUrl(rHdr, 'token') || '';
 
   // Gläubiger-ID: direkt | Referer
   let credId = String(p.glaeubiger || p['gläubiger'] || p.cid || p.idnum || '').trim();
   if (!credId && p.id) credId = String(p.id).trim();
-  if (!credId && hdrRef) credId = queryFromUrl(hdrRef, 'id') || '';
+  if (!credId && rHdr) credId = queryFromUrl(rHdr, 'id') || '';
 
   if (!email) {
-    return { statusCode: 400, headers: cors(inferredOrigin), body: 'missing email' };
+    return { statusCode: 400, headers: cors(reqOrigin), body: 'missing email' };
   }
 
   try {
@@ -108,7 +109,7 @@ exports.handler = async (event) => {
     });
     if (!r.ok) {
       const t = await r.text();
-      return { statusCode: 502, headers: cors(inferredOrigin), body: `Mailjet fetch failed: ${t}` };
+      return { statusCode: 502, headers: cors(reqOrigin), body: `Mailjet fetch failed: ${t}` };
     }
     const json = await r.json();
     const props = Object.fromEntries((json.Data?.[0]?.Data || []).map(pp => [pp.Name, pp.Value]));
@@ -127,7 +128,7 @@ exports.handler = async (event) => {
       if (expiryRaw) {
         const exp = new Date(expiryRaw);
         if (isFinite(exp) && exp < new Date()) {
-          return { statusCode: 410, headers: cors(inferredOrigin), body: 'Token expired' };
+          return { statusCode: 410, headers: cors(reqOrigin), body: 'Token expired' };
         }
       }
 
@@ -139,7 +140,7 @@ exports.handler = async (event) => {
     }
 
     if (!authorized) {
-      return { statusCode: 403, headers: cors(inferredOrigin), body: 'auth required' };
+      return { statusCode: 403, headers: cors(reqOrigin), body: 'auth required' };
     }
 
     // Daten fürs Frontend
@@ -156,10 +157,10 @@ exports.handler = async (event) => {
 
     return {
       statusCode: 200,
-      headers: { ...cors(inferredOrigin), 'Content-Type': 'application/json' },
+      headers: { ...cors(reqOrigin), 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
       body: JSON.stringify(data)
     };
   } catch (e) {
-    return { statusCode: 500, headers: cors(inferredOrigin), body: 'server error: ' + e.message };
+    return { statusCode: 500, headers: cors(reqOrigin), body: 'server error: ' + e.message };
   }
 };
