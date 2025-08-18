@@ -103,39 +103,19 @@ exports.handler = async (event) => {
     if (event.httpMethod !== 'POST') {
       return { statusCode: 405, body: 'Method Not Allowed' };
     }
+
+    // === Internal-Key-Gate (eingebaut, sonst nichts geändert) ===
+    const origin = event.headers.origin || event.headers.Origin || '';
+    const given  = event.headers['x-internal-key'] || event.headers['X-Internal-Key'] || '';
+    const expect = process.env.INTERNAL_VERIFY_KEY || '';
+    if (!expect || given !== expect) {
+      return {
+        statusCode: 403,
+        headers: { 'Access-Control-Allow-Origin': origin || '*', 'Vary': 'Origin' },
+        body: 'auth required'
+      };
+    }
+    // ============================================================
+
     const body = parseBody(event);
-    const email = String(body.email || '').trim().toLowerCase();
-    const id    = String(body.id || '').trim();
-    const lang  = String((body.lang || 'de')).toLowerCase();
-    const name  = String(body.name || '').trim();
-    const send  = String(body.send || '').toLowerCase();
-    if (!email || !id) {
-      return { statusCode: 400, body: 'missing email or id' };
-    }
-
-    // Generate token & 7-day expiry
-    const token = randomToken(16);
-    const expiresAt = new Date(Date.now() + 7*24*60*60*1000).toISOString();
-
-    // Persist in Mailjet
-    await setTokenInMailjet(email, token, expiresAt);
-
-    // Build verify URL
-    const em = b64url(email);
-    const url = `${BASE_VERIFY_URL}/?lang=${encodeURIComponent(lang)}&id=${encodeURIComponent(id)}&token=${encodeURIComponent(token)}&em=${encodeURIComponent(em)}`;
-
-    let sent = false;
-    if (send === '1' || send === 'true') {
-      await sendMailjet(email, name, url, lang);
-      sent = true;
-    }
-
-    return {
-      statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ok: true, token, expiresAt, url, sent })
-    };
-  } catch (err) {
-    return { statusCode: 500, body: `server error: ${err.message}` };
-  }
-};
+    const email = String(body.email || '').trim().
