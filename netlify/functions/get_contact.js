@@ -40,6 +40,24 @@ function queryFromUrl(url, key) {
   catch { return ''; }
 }
 
+// ===== NEU: Helper für robuste Feldsuche & ID-Normalisierung =====
+function pickProp(obj, candidates) {
+  if (!obj) return '';
+  // 1) Direktversuch
+  for (const k of candidates) {
+    if (obj[k] != null && obj[k] !== '') return String(obj[k]);
+  }
+  // 2) Case-insensitive
+  const keys = Object.keys(obj);
+  for (const k of candidates) {
+    const found = keys.find(kk => kk.toLowerCase() === String(k).toLowerCase());
+    if (found && obj[found] != null && obj[found] !== '') return String(obj[found]);
+  }
+  return '';
+}
+const normNum = (x) => String(x || '').replace(/\D/g, '').replace(/^0+/, '');
+// ================================================================
+
 exports.handler = async (event) => {
   const origin = (event.headers && (event.headers.origin || event.headers.Origin)) || undefined;
   const referer = (event.headers && (event.headers.referer || event.headers.Referer)) || '';
@@ -51,13 +69,13 @@ exports.handler = async (event) => {
     return { statusCode: 405, headers: cors(origin), body: 'Method Not Allowed' };
   }
 
-  // --- Neu: Public nur für erlaubte Origins (oder mit internem Key) ---
+  // --- Public nur für erlaubte Origins (oder mit internem Key) ---
   const internalOK = hasInternalAuth(event.headers);
   const originOK   = ALLOW_ORIGINS.has(origin || '');
   if (!internalOK && !originOK) {
     return { statusCode: 403, headers: cors(origin), body: 'forbidden' };
   }
-  // --------------------------------------------------------------------
+  // ----------------------------------------------------------------
 
   const p = event.queryStringParameters || {};
 
@@ -102,52 +120,8 @@ exports.handler = async (event) => {
     if (internalOK) {
       authorized = true; // server-zu-Server (z. B. send_verify_email)
     } else if (REQUIRE_AUTH && token) {
-      const propToken = String(props['token_verify'] || '').trim();
-      const propCred  = String(props['gläubiger'] ?? props['glaeubiger'] ?? '').trim();
+      const propToken = pickProp(props, ['token_verify', 'Token_verify', 'TOKEN_VERIFY']);
+      const propCred  = pickProp(props, ['gläubiger', 'glaeubiger', 'Glaeubiger', 'GlaeubigerID', 'CreditorId', 'CreditorID']);
 
       // Ablauf prüfen (falls vorhanden)
-      const expiryRaw = props['Token_verify_expiry'] || props['token_verify_expiry'] || props['token_expiry'] || '';
-      if (expiryRaw) {
-        const exp = new Date(expiryRaw);
-        if (isFinite(exp) && exp < new Date()) {
-          return { statusCode: 410, headers: cors(origin), body: 'Token expired' };
-        }
-      }
-
-      if (propToken && propToken === token) {
-        // wenn eine echte Gläubiger-ID mitgeschickt wurde, muss sie passen
-        if (!credId || credId === propCred) {
-          authorized = true;
-        }
-      }
-    }
-
-    if (!authorized) {
-      return { statusCode: 403, headers: cors(origin), body: 'auth required' };
-    }
-
-    // ---- Nur wenn autorisiert: Daten fürs Frontend zurückgeben ----
-    const data = {
-      glaeubiger: props['gläubiger'] ?? props['glaeubiger'] ?? '',
-      firstname:  props['firstname']  ?? '',
-      name:       props['name']       ?? '',
-      strasse:    props['strasse']    ?? '',
-      hausnummer: props['hausnummer'] ?? '',
-      plz:        props['plz']        ?? '',
-      ort:        props['ort']        ?? '',
-      country:    props['country']    ?? ''
-    };
-
-    return {
-      statusCode: 200,
-      headers: {
-        ...cors(origin),
-        'Content-Type': 'application/json',
-        'Vary': 'Origin, X-Internal-Key, Referer'
-      },
-      body: JSON.stringify(data)
-    };
-  } catch (e) {
-    return { statusCode: 500, headers: cors(origin), body: 'server error: ' + e.message };
-  }
-};
+      const expiryRaw =
