@@ -40,6 +40,19 @@ function queryFromUrl(url, key) {
   catch { return ''; }
 }
 
+// Robuste Property-Suche + ID-Normalisierung
+function pickProp(obj, candidates) {
+  if (!obj) return '';
+  for (const k of candidates) if (obj[k] != null && obj[k] !== '') return String(obj[k]);
+  const keys = Object.keys(obj||{});
+  for (const k of candidates) {
+    const f = keys.find(kk => kk.toLowerCase() === String(k).toLowerCase());
+    if (f && obj[f] != null && obj[f] !== '') return String(obj[f]);
+  }
+  return '';
+}
+const normNum = (x) => String(x || '').replace(/\D/g, '').replace(/^0+/, '');
+
 exports.handler = async (event) => {
   const origin = (event.headers && (event.headers.origin || event.headers.Origin)) || undefined;
   const referer = (event.headers && (event.headers.referer || event.headers.Referer)) || '';
@@ -51,9 +64,16 @@ exports.handler = async (event) => {
     return { statusCode: 405, headers: cors(origin), body: 'Method Not Allowed' };
   }
 
+  // Public nur für erlaubte Origins (oder mit internem Key)
+  const internalOK = hasInternalAuth(event.headers);
+  const originOK   = ALLOW_ORIGINS.has(origin || '');
+  if (!internalOK && !originOK) {
+    return { statusCode: 403, headers: cors(origin), body: 'forbidden' };
+  }
+
   const p = event.queryStringParameters || {};
 
-  // ---- Email ermitteln: ?email=... ODER ?em=... ODER aus Referer ----
+  // Email: ?email=... | ?em=... | Referer
   let email = String(p.email || '').trim().toLowerCase();
   if (!email && p.em) email = b64urlDecode(String(p.em)).trim().toLowerCase();
   if (!email && referer) {
@@ -63,11 +83,11 @@ exports.handler = async (event) => {
     else if (emailRef) email = emailRef.trim().toLowerCase();
   }
 
-  // ---- Token ermitteln: ?token=... ODER aus Referer ----
+  // Token: ?token=... | Referer
   let token = String(p.token || '').trim();
   if (!token && referer) token = queryFromUrl(referer, 'token') || '';
 
-  // ---- (optionale) Gläubiger-ID: direkt ODER aus Referer ----
+  // Gläubiger-ID: direkt | Referer
   let credId = String(p.glaeubiger || p['gläubiger'] || p.cid || p.idnum || '').trim();
   if (!credId && p.id) credId = String(p.id).trim();
   if (!credId && referer) credId = queryFromUrl(referer, 'id') || '';
@@ -88,17 +108,17 @@ exports.handler = async (event) => {
     const json = await r.json();
     const props = Object.fromEntries((json.Data?.[0]?.Data || []).map(pp => [pp.Name, pp.Value]));
 
-    // ---- Autorisierung: interner Header ODER (id+token) prüfen ----
+    // Autorisierung: interner Header ODER (id+token) prüfen
     let authorized = false;
 
-    if (hasInternalAuth(event.headers)) {
+    if (internalOK) {
       authorized = true; // server-zu-Server (z. B. send_verify_email)
     } else if (REQUIRE_AUTH && token) {
-      const propToken = String(props['token_verify'] || '').trim();
-      const propCred  = String(props['gläubiger'] ?? props['glaeubiger'] ?? '').trim();
+      const propToken = pickProp(props, ['token_verify', 'Token_verify', 'TOKEN_VERIFY']);
+      const propCred  = pickProp(props, ['gläubiger','glaeubiger','Glaeubiger','GlaeubigerID','CreditorId','CreditorID']);
 
       // Ablauf prüfen (falls vorhanden)
-      const expiryRaw = props['Token_verify_expiry'] || props['token_verify_expiry'] || props['token_expiry'] || '';
+      const expiryRaw = pickProp(props, ['Token_verify_expiry','token_verify_expiry','token_expiry','TokenExpiry']);
       if (expiryRaw) {
         const exp = new Date(expiryRaw);
         if (isFinite(exp) && exp < new Date()) {
@@ -107,8 +127,8 @@ exports.handler = async (event) => {
       }
 
       if (propToken && propToken === token) {
-        // wenn eine echte Gläubiger-ID mitgeschickt wurde, muss sie passen
-        if (!credId || credId === propCred) {
+        // Gläubiger-ID tolerant (nur Ziffern, führende Nullen ignorieren)
+        if (!credId || normNum(credId) === normNum(propCred)) {
           authorized = true;
         }
       }
@@ -118,16 +138,16 @@ exports.handler = async (event) => {
       return { statusCode: 403, headers: cors(origin), body: 'auth required' };
     }
 
-    // ---- Nur wenn autorisiert: Daten fürs Frontend zurückgeben ----
+    // Daten fürs Frontend
     const data = {
-      glaeubiger: props['gläubiger'] ?? props['glaeubiger'] ?? '',
-      firstname:  props['firstname']  ?? '',
-      name:       props['name']       ?? '',
-      strasse:    props['strasse']    ?? '',
-      hausnummer: props['hausnummer'] ?? '',
-      plz:        props['plz']        ?? '',
-      ort:        props['ort']        ?? '',
-      country:    props['country']    ?? ''
+      glaeubiger: pickProp(props, ['gläubiger','glaeubiger','Glaeubiger','CreditorId','CreditorID']) || '',
+      firstname:  pickProp(props, ['firstname','FirstName','Vorname','vorname']) || '',
+      name:       pickProp(props, ['name','Name','Nachname','nachname','LastName','lastname']) || '',
+      strasse:    pickProp(props, ['strasse','straße','Strasse','Straße','Street']) || '',
+      hausnummer: pickProp(props, ['hausnummer','Hausnummer','hnr','Hnr','HouseNumber']) || '',
+      plz:        pickProp(props, ['plz','PLZ','zip','Zip','PostalCode','postalcode']) || '',
+      ort:        pickProp(props, ['ort','Ort','city','City']) || '',
+      country:    pickProp(props, ['country','Country','Land','land']) || ''
     };
 
     return {
