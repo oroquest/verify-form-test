@@ -2,6 +2,7 @@
 const MJ_PUBLIC  = process.env.MJ_APIKEY_PUBLIC;
 const MJ_PRIVATE = process.env.MJ_APIKEY_PRIVATE;
 const mjAuth = 'Basic ' + Buffer.from(`${MJ_PUBLIC}:${MJ_PRIVATE}`).toString('base64');
+const crypto = require('crypto'); // ← NEU
 
 // Feature-Toggles
 const ENFORCE_EXPIRY     = true;   // Token muss vor Ablauf genutzt werden
@@ -50,6 +51,27 @@ function validatePLZ(plz, country) {
   return /^\d{4,6}$/.test(p);
 }
 
+// ==== NEU: sichere Vergleiche & Property-Picker ====
+const timingSafeEq = (a, b) => {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  const A = Buffer.from(a);
+  const B = Buffer.from(b);
+  if (A.length !== B.length) return false;
+  try { return crypto.timingSafeEqual(A, B); } catch { return false; }
+};
+const normNum = (x) => String(x ?? '').replace(/\D/g, '').replace(/^0+/, '');
+function pickProp(obj, candidates) {
+  if (!obj) return '';
+  for (const k of candidates) if (obj[k] != null && obj[k] !== '') return String(obj[k]);
+  const keys = Object.keys(obj||{});
+  for (const k of candidates) {
+    const f = keys.find(kk => kk.toLowerCase() === String(k).toLowerCase());
+    if (f && obj[f] != null && obj[f] !== '') return String(obj[f]);
+  }
+  return '';
+}
+// ===================================================
+
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' };
@@ -96,13 +118,13 @@ exports.handler = async (event) => {
     const theProps = Object.fromEntries(propsArray.map(p => [p.Name, p.Value]));
 
     // 2) Pflicht-Validierungen (ID/Token)
-    const glaeubigerVal = (theProps['gläubiger'] ?? theProps['glaeubiger'] ?? '').toString().trim();
-    const tokenVerify   = (theProps['token_verify'] || '').toString().trim();
+    const glaeubigerVal = pickProp(theProps, ['gläubiger','glaeubiger','Glaeubiger','GlaeubigerID','CreditorId','CreditorID']).toString().trim(); // ← NEU
+    const tokenVerify   = pickProp(theProps, ['token_verify','Token_verify','TOKEN_VERIFY']).toString().trim();                                        // ← NEU
 
-    if (glaeubigerVal !== String(id).trim()) {
+    if (normNum(glaeubigerVal) !== normNum(String(id).trim())) { // ← NEU (tolerant)
       return { statusCode: 403, body: 'ID mismatch' };
     }
-    if (!tokenVerify || tokenVerify !== token) {
+    if (!tokenVerify || !timingSafeEq(tokenVerify, String(token))) { // ← NEU (timing-safe)
       return { statusCode: 403, body: 'Invalid token' };
     }
 
@@ -161,12 +183,13 @@ exports.handler = async (event) => {
     }
 
     // 7) Erfolg → je nach Clienttyp JSON oder Redirect
-    const isAjax = /json/i.test(event.headers['accept'] || '') ||
-                   (event.headers['x-requested-with'] || '').toLowerCase() === 'fetch';
+    const acceptH = H['accept'] || H['Accept'] || ''; // ← robust
+    const isAjax = /json/i.test(acceptH) ||
+                   (H['x-requested-with'] || H['X-Requested-With'] || '').toLowerCase() === 'fetch';
     if (isAjax) {
       return {
         statusCode: 200,
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
         body: JSON.stringify({ ok: true, redirect: 'https://verify.sikuralife.com/danke.html' })
       };
     }
