@@ -1,26 +1,19 @@
+# netlify.toml — Safe Mode Hardening
 [functions]
   node_bundler = "esbuild"
   directory = "netlify/functions"
 
-# Site-weit: Security-Header + CSP nur als Report-Only (bricht nichts)
+# Global security headers (safe, non-breaking)
 [[headers]]
   for = "/*"
   [headers.values]
-  Content-Security-Policy-Report-Only = "default-src 'self'; base-uri 'self'; frame-ancestors 'none'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self'; form-action 'self'"
-  X-Content-Type-Options = "nosniff"
-  X-Frame-Options = "DENY"
-  Referrer-Policy = "no-referrer"
-  Permissions-Policy = "geolocation=(), microphone=(), camera=()"
-  Strict-Transport-Security = "max-age=31536000; includeSubDomains"
+    Referrer-Policy = "no-referrer"
+    X-Content-Type-Options = "nosniff"
+    X-Frame-Options = "DENY"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains"
 
-# ENFORCE CSP NUR auf danke.html (Zero-Break-Variante)
+# Prevent caching of the landing page (token in URL)
 [[headers]]
-  for = "/danke.html"
+  for = "/"
   [headers.values]
-  Content-Security-Policy = "default-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https:; font-src 'self' data: https:"
-
-# ENFORCE CSP NUR auf privacy.html (Zero-Break-Variante)
-[[headers]]
-  for = "/privacy.html"
-  [headers.values]
-  Content-Security-Policy = "default-src 'self'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; connect-src 'self' https:; font-src 'self' data: https:"
+    Cache-Control = "no-store"

@@ -1,13 +1,20 @@
 // netlify/functions/send_verify_email.js
 // Mailversand ohne Mailjet-SDK – direkte v3.1 REST API via native fetch
 
+const INTERNAL_VERIFY_KEY = process.env.INTERNAL_VERIFY_KEY || "";
+
 exports.handler = async (event) => {
   try {
     if (event.httpMethod !== "POST") {
       return { statusCode: 405, body: "Method Not Allowed" };
     }
 
-    const env = (k) => {
+    
+    const __k = event.headers[\"x-internal-key\"] || event.headers[\"X-Internal-Key\"] || \"\";
+    if (!INTERNAL_VERIFY_KEY || __k !== INTERNAL_VERIFY_KEY) {
+      return { statusCode: 403, body: \"forbidden\" };
+    }
+const env = (k) => {
       const v = process.env[k];
       if (!v) throw new Error(`Missing ENV ${k}`);
       return v;
