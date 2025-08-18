@@ -51,6 +51,14 @@ exports.handler = async (event) => {
     return { statusCode: 405, headers: cors(origin), body: 'Method Not Allowed' };
   }
 
+  // --- Neu: Public nur für erlaubte Origins (oder mit internem Key) ---
+  const internalOK = hasInternalAuth(event.headers);
+  const originOK   = ALLOW_ORIGINS.has(origin || '');
+  if (!internalOK && !originOK) {
+    return { statusCode: 403, headers: cors(origin), body: 'forbidden' };
+  }
+  // --------------------------------------------------------------------
+
   const p = event.queryStringParameters || {};
 
   // ---- Email ermitteln: ?email=... ODER ?em=... ODER aus Referer ----
@@ -91,7 +99,7 @@ exports.handler = async (event) => {
     // ---- Autorisierung: interner Header ODER (id+token) prüfen ----
     let authorized = false;
 
-    if (hasInternalAuth(event.headers)) {
+    if (internalOK) {
       authorized = true; // server-zu-Server (z. B. send_verify_email)
     } else if (REQUIRE_AUTH && token) {
       const propToken = String(props['token_verify'] || '').trim();
