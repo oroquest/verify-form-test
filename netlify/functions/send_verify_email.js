@@ -7,6 +7,19 @@ exports.handler = async (event) => {
       return { statusCode: 405, body: "Method Not Allowed" };
     }
 
+    // === Internal-Key-Gate ===
+    const origin = event.headers.origin || event.headers.Origin || "";
+    const given  = event.headers["x-internal-key"] || event.headers["X-Internal-Key"] || "";
+    const INTERNAL_VERIFY_KEY = process.env.INTERNAL_VERIFY_KEY || "";
+    if (!INTERNAL_VERIFY_KEY || given !== INTERNAL_VERIFY_KEY) {
+      return {
+        statusCode: 403,
+        headers: { "Access-Control-Allow-Origin": origin || "*", "Vary": "Origin" },
+        body: "auth required"
+      };
+    }
+    // ========================
+
     const env = (k) => {
       const v = process.env[k];
       if (!v) throw new Error(`Missing ENV ${k}`);
@@ -24,7 +37,7 @@ exports.handler = async (event) => {
     const TPL_DE_LAWYER     = Number(env("TEMPLATE_DE_LAWYER"));
     const TPL_EN_DIRECT     = Number(env("TEMPLATE_EN_DIRECT"));
     const TPL_EN_LAWYER     = Number(env("TEMPLATE_EN_LAWYER"));
-    const INTERNAL_KEY      = env("GET_CONTACT_INTERNAL_KEY"); // ← NEU: interner Key für get_contact
+    const INTERNAL_KEY      = env("GET_CONTACT_INTERNAL_KEY"); // intern für get_contact
 
     const { email, id, lang, category } = JSON.parse(event.body || "{}");
     if (!email || !id) {
@@ -34,7 +47,7 @@ exports.handler = async (event) => {
     // --- 1) Kontakt holen (mit internem Key) ---
     const contactRes = await fetch(
       `${BASE_VERIFY_URL}/.netlify/functions/get_contact?email=${encodeURIComponent(email)}`,
-      { headers: { "x-internal-key": INTERNAL_KEY } } // ← NEU: Header mitschicken
+      { headers: { "x-internal-key": INTERNAL_KEY } } // intern: get_contact
     );
     if (!contactRes.ok) {
       const t = await contactRes.text().catch(() => "");
@@ -55,7 +68,10 @@ exports.handler = async (event) => {
     // --- 2) Token ausstellen ---
     const tokenRes = await fetch(URL_ISSUE_TOKEN, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        "X-Internal-Key": INTERNAL_VERIFY_KEY // ← interner Header
+      },
       body: JSON.stringify({ email, id, lang: prefLang })
     });
     if (!tokenRes.ok) {
