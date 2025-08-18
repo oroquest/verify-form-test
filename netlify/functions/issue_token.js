@@ -103,6 +103,20 @@ exports.handler = async (event) => {
     if (event.httpMethod !== 'POST') {
       return { statusCode: 405, body: 'Method Not Allowed' };
     }
+
+    // === Internal-Key-Gate ===
+    const origin = event.headers.origin || event.headers.Origin || '';
+    const given  = event.headers['x-internal-key'] || event.headers['X-Internal-Key'] || '';
+    const expect = process.env.INTERNAL_VERIFY_KEY || '';
+    if (!expect || given !== expect) {
+      return {
+        statusCode: 403,
+        headers: { 'Access-Control-Allow-Origin': origin || '*', 'Vary': 'Origin' },
+        body: 'auth required'
+      };
+    }
+    // ========================
+
     const body = parseBody(event);
     const email = String(body.email || '').trim().toLowerCase();
     const id    = String(body.id || '').trim();
@@ -120,7 +134,7 @@ exports.handler = async (event) => {
     // Persist in Mailjet
     await setTokenInMailjet(email, token, expiresAt);
 
-    // Build verify URL
+    // Build verify URL (legacy format)
     const em = b64url(email);
     const url = `${BASE_VERIFY_URL}/?lang=${encodeURIComponent(lang)}&id=${encodeURIComponent(id)}&token=${encodeURIComponent(token)}&em=${encodeURIComponent(em)}`;
 
