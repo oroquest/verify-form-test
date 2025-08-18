@@ -98,19 +98,10 @@ async function sendMailjet(toEmail, toName, verifyUrl, lang) {
   }
 }
 
-
-// --- Internal auth guard (added) ---
-const INTERNAL_VERIFY_KEY = process.env.INTERNAL_VERIFY_KEY || "";
-function hasInternalAuth(headers = {}) {
-  const h = headers["x-internal-key"] || headers["X-Internal-Key"] || "";
-  return Boolean(INTERNAL_VERIFY_KEY) && h === INTERNAL_VERIFY_KEY;
-}
 exports.handler = async (event) => {
   try {
     if (event.httpMethod !== 'POST') {
-      return { statusCode: 405, body: 'Method Not Allowed' }
-    if (!hasInternalAuth(event.headers)) { return { statusCode: 403, body: 'forbidden' }; }
-;
+      return { statusCode: 405, body: 'Method Not Allowed' };
     }
     const body = parseBody(event);
     const email = String(body.email || '').trim().toLowerCase();
