@@ -1,9 +1,18 @@
-// health_env.js – ganz oben ergänzen
-const INTERNAL_KEY = process.env.INTERNAL_VERIFY_KEY || "";
-const hdrKey = (h) => h["x-internal-key"] || h["X-Internal-Key"] || "";
-if (!INTERNAL_KEY || hdrKey(event.headers) !== INTERNAL_KEY) {
-  return { statusCode: 403, headers: ok(event.headers.origin), body: "forbidden" };
-}
+// netlify/functions/health_env.js
+exports.handler = async (event) => {
+  const INTERNAL_KEY = process.env.INTERNAL_VERIFY_KEY || "";
+  const hdrKey = (h) => h["x-internal-key"] || h["X-Internal-Key"] || "";
+
+  if (!INTERNAL_KEY || hdrKey(event.headers) !== INTERNAL_KEY) {
+    return { statusCode: 403, body: "forbidden" };
+  }
+
+  return {
+    statusCode: 200,
+    headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
+    body: JSON.stringify({ ok: true, env: Object.keys(process.env).length })
+  };
+};
 
 
 // netlify/functions/health_env.js
